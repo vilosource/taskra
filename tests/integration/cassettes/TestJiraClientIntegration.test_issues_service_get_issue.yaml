@@ -1,0 +1,76 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept:
+      - application/json
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.32.3
+    method: GET
+    uri: https://example.atlassian.net/rest/api/3/issue/TEST-1
+  response:
+    body:
+      string: '{"errorMessages":["Issue does not exist or you do not have permission
+        to see it."],"errors":{}}'
+    headers:
+      Atl-Request-Id:
+      - c564797a-ba4b-4b61-8e59-3517b86366c2
+      Atl-Traceid:
+      - c564797aba4b4b618e593517b86366c2
+      Cache-Control:
+      - no-cache, no-store, no-transform
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json;charset=UTF-8
+      Date:
+      - Fri, 28 Mar 2025 06:13:36 GMT
+      Nel:
+      - '{"failure_fraction": 0.001, "include_subdomains": true, "max_age": 600, "report_to":
+        "endpoint-1"}'
+      Report-To:
+      - '{"endpoints": [{"url": "https://dz8aopenkvv6s.cloudfront.net"}], "group":
+        "endpoint-1", "include_subdomains": true, "max_age": 600}'
+      Server:
+      - AtlassianEdge
+      Server-Timing:
+      - atl-edge;dur=120,atl-edge-internal;dur=14,atl-edge-upstream;dur=106,atl-edge-pop;desc="aws-eu-central-1"
+      Set-Cookie:
+      - atlassian.xsrf.token=8698fb9cd28b1bbc1ae380f1a40fb326f12151b8_lout; Path=/;
+        SameSite=None; Secure
+      Strict-Transport-Security:
+      - max-age=63072000; includeSubDomains; preload
+      Timing-Allow-Origin:
+      - '*'
+      Transfer-Encoding:
+      - chunked
+      Via:
+      - 1.1 e3d7e26a5df51c85de01773b18b95a58.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - zMfZffaXcAuemXmslS5I_9-N5iN4UVhZ7LE3xW9NjzVVw9YQTrzyAg==
+      X-Amz-Cf-Pop:
+      - HEL51-P1
+      X-Arequestid:
+      - 52a30f2c1bdebaec0f0bd1127c7792ec
+      X-Cache:
+      - Error from cloudfront
+      X-Content-Type-Options:
+      - nosniff
+      X-Seraph-Loginreason:
+      - AUTHENTICATED_FAILED
+      X-Trace-Id:
+      - c564797aba4b4b618e593517b86366c2
+      X-Xss-Protection:
+      - 1; mode=block
+    status:
+      code: 404
+      message: Not Found
+version: 1

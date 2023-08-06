@@ -2,7 +2,7 @@
 
 from typing import Dict, List, Optional, Any
 from datetime import datetime
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 
 class Author(BaseModel):
@@ -11,10 +11,7 @@ class Author(BaseModel):
     account_id: str = Field(..., alias="accountId")
     display_name: str = Field(..., alias="displayName")
     
-    class Config:
-        """Pydantic configuration."""
-        
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class Visibility(BaseModel):
@@ -39,11 +36,7 @@ class Worklog(BaseModel):
     issue_id: Optional[str] = Field(None, alias="issueId")
     visibility: Optional[Visibility] = None
     
-    class Config:
-        """Pydantic configuration."""
-        
-        populate_by_name = True
-        extra = "ignore"
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
 
 class WorklogCreate(BaseModel):
@@ -53,10 +46,7 @@ class WorklogCreate(BaseModel):
     started: Optional[datetime] = None  # If not provided, current time will be used
     comment: Optional[str] = None
     
-    class Config:
-        """Pydantic configuration."""
-        
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
     
     @field_validator("time_spent_seconds")
     def validate_time_spent(cls, v):
@@ -124,7 +114,4 @@ class WorklogList(BaseModel):
     total: int
     worklogs: List[Worklog]
     
-    class Config:
-        """Pydantic configuration."""
-        
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)

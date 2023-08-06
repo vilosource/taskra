@@ -11,7 +11,7 @@ vcr = VCR(
     record_mode='once'
 )
 
-@pytest.fixture
+@pytest.fixture(scope="module")  # Change scope to module to match the test scope
 def vcr_config():
     """VCR configuration."""
     return {

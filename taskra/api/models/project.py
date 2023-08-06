@@ -2,7 +2,7 @@
 
 from typing import Dict, List, Optional, Any
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class ProjectCategory(BaseModel):
@@ -60,12 +60,10 @@ class Project(ProjectSummary):
     style: Optional[str] = None
     is_private: Optional[bool] = Field(None, alias="isPrivate")
     
-    class Config:
-        """Pydantic configuration."""
-        
-        populate_by_name = True
-        # Allow extra attributes that might be returned by the API
-        extra = "ignore"
+    model_config = ConfigDict(
+        populate_by_name=True,
+        extra="ignore"  # Allow extra attributes that might be returned by the API
+    )
 
 
 class ProjectList(BaseModel):
@@ -77,7 +75,4 @@ class ProjectList(BaseModel):
     is_last: bool = Field(..., alias="isLast")
     values: List[ProjectSummary]
     
-    class Config:
-        """Pydantic configuration."""
-        
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)

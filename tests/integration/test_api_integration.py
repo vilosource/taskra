@@ -28,7 +28,7 @@ class TestJiraClientIntegration:
         client = get_client()
         assert client.base_url == "https://example.atlassian.net/rest/api/3/"
         
-    @pytest.mark.vcr()  # Uses VCR.py to record/replay HTTP interactions
+    @pytest.mark.vcr(scope="module")  # Specify module scope for VCR
     def test_projects_service_list_projects(self, mock_env_vars):
         """Test ProjectsService can list projects through the API."""
         client = get_client()
@@ -41,7 +41,7 @@ class TestJiraClientIntegration:
             assert "key" in projects[0]
             assert "name" in projects[0]
     
-    @pytest.mark.vcr()
+    @pytest.mark.vcr(scope="module")  # Specify module scope for VCR
     def test_issues_service_get_issue(self, mock_env_vars):
         """Test IssuesService can retrieve an issue."""
         client = get_client()
@@ -53,7 +53,7 @@ class TestJiraClientIntegration:
         
         assert issue["key"] == issue_key
         
-    @pytest.mark.vcr()
+    @pytest.mark.vcr(scope="module")  # Specify module scope for VCR
     def test_create_and_get_worklog(self, mock_env_vars):
         """Test creating and retrieving a worklog - full integration flow."""
         client = get_client()

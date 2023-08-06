@@ -1,0 +1,77 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept:
+      - application/json
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.32.3
+    method: GET
+    uri: https://example.atlassian.net/rest/api/3/project/search?startAt=0&maxResults=50
+  response:
+    body:
+      string: '{"self":"https://example.atlassian.net/rest/api/3/project/search?maxResults=50&startAt=0","maxResults":50,"startAt":0,"total":0,"isLast":true,"values":[]}'
+    headers:
+      Atl-Request-Id:
+      - d3a81989-2e5a-4768-b7fa-de9f9bd6f2ab
+      Atl-Traceid:
+      - d3a819892e5a4768b7fade9f9bd6f2ab
+      Cache-Control:
+      - no-cache, no-store, no-transform
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json;charset=UTF-8
+      Date:
+      - Fri, 28 Mar 2025 06:13:35 GMT
+      Nel:
+      - '{"failure_fraction": 0.001, "include_subdomains": true, "max_age": 600, "report_to":
+        "endpoint-1"}'
+      Report-To:
+      - '{"endpoints": [{"url": "https://dz8aopenkvv6s.cloudfront.net"}], "group":
+        "endpoint-1", "include_subdomains": true, "max_age": 600}'
+      Server:
+      - AtlassianEdge
+      Server-Timing:
+      - cdn-upstream-layer;desc="EDGE",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=24,cdn-upstream-fbl;dur=217,atl-edge;dur=121,atl-edge-internal;dur=14,atl-edge-upstream;dur=107,atl-edge-pop;desc="aws-eu-central-1",cdn-cache-miss,cdn-pop;desc="HEL51-P1",cdn-rid;desc="wvWisbxRtSqiVR8X-5iPTS_ODupeso0uNYikJ0kbBpVDNMRar50kwQ==",cdn-downstream-fbl;dur=222
+      Set-Cookie:
+      - atlassian.xsrf.token=5a973afdb56d7b0678420eeaa5ee034bdbf0a1e6_lout; Path=/;
+        SameSite=None; Secure
+      Strict-Transport-Security:
+      - max-age=63072000; includeSubDomains; preload
+      Timing-Allow-Origin:
+      - '*'
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Accept-Encoding
+      Via:
+      - 1.1 15f101bbbd2c0af1fa1038ce000605c6.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - wvWisbxRtSqiVR8X-5iPTS_ODupeso0uNYikJ0kbBpVDNMRar50kwQ==
+      X-Amz-Cf-Pop:
+      - HEL51-P1
+      X-Arequestid:
+      - de2b1e09a4f2b394ab51348f6f122113
+      X-Cache:
+      - Miss from cloudfront
+      X-Content-Type-Options:
+      - nosniff
+      X-Seraph-Loginreason:
+      - AUTHENTICATED_FAILED
+      X-Trace-Id:
+      - d3a819892e5a4768b7fade9f9bd6f2ab
+      X-Xss-Protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+version: 1

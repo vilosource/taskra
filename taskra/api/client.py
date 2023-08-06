@@ -1,171 +1,182 @@
-"""
-Jira API client implementation.
+"""Client for interacting with the Jira REST API."""
 
-This module provides the base JiraClient class for interacting with the Jira REST API v3,
-as well as a factory function to obtain a configured client instance.
-"""
-
-import os
-from typing import Dict, Optional, Any, Union
+import json
+import logging
+import requests
+from typing import Dict, Any, Optional
 from urllib.parse import urljoin
 
-import requests
-from requests.auth import HTTPBasicAuth
+from .auth import get_auth_details
 
 
 class JiraClient:
     """
     Client for interacting with the Jira REST API.
     
-    This client handles authentication, request formation, and basic error handling
-    for communicating with the Jira REST API v3.
+    Handles authentication and HTTP operations against the Jira API endpoints.
     """
     
-    def __init__(self, base_url: str, auth: Union[HTTPBasicAuth, Dict[str, str]], timeout: int = 30):
+    def __init__(self, base_url: str, auth: Dict[str, str], debug: bool = False):
         """
-        Initialize the Jira client.
+        Initialize a new Jira client.
         
         Args:
-            base_url: Base URL for the Jira instance (e.g., https://your-domain.atlassian.net)
-            auth: Authentication credentials, either HTTPBasicAuth object or dict with token
-            timeout: Request timeout in seconds
+            base_url: Base URL for the Jira instance (e.g., https://mycompany.atlassian.net)
+            auth: Authentication details (email and token)
+            debug: Enable debug output
         """
-        self.base_url = base_url.rstrip('/') + '/rest/api/3/'
-        self.auth = auth
-        self.timeout = timeout
-        self.session = requests.Session()
+        self.debug = debug
         
-        # Set default headers
+        # Ensure base URL ends with a trailing slash
+        if not base_url.endswith('/'):
+            base_url = f"{base_url}/"
+            
+        # Add API path if not already present
+        if not base_url.endswith("/rest/api/3/"):
+            self.base_url = urljoin(base_url, "rest/api/3/")
+        else:
+            self.base_url = base_url
+            
+        self.auth = auth
+        self.session = requests.Session()
+        self.session.auth = (auth["email"], auth["token"])
         self.session.headers.update({
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
+            "Accept": "application/json",
+            "Content-Type": "application/json"
         })
         
-        # Configure authentication
-        if isinstance(auth, dict) and 'token' in auth:
-            self.session.headers.update({
-                'Authorization': f"Bearer {auth['token']}"
-            })
-        elif isinstance(auth, HTTPBasicAuth):
-            self.session.auth = auth
+        if debug:
+            logging.basicConfig(level=logging.DEBUG)
+            self.logger = logging.getLogger("jira_client")
+            self.logger.debug(f"Initialized JiraClient with base URL: {self.base_url}")
     
-    def _build_url(self, endpoint: str) -> str:
-        """
-        Build a complete API URL from the given endpoint.
-        
-        Args:
-            endpoint: API endpoint path
+    def _log_request(self, method: str, url: str, **kwargs):
+        """Log request details if debug mode is enabled."""
+        if not self.debug:
+            return
             
-        Returns:
-            Complete URL
-        """
-        return urljoin(self.base_url, endpoint.lstrip('/'))
+        self.logger.debug(f"Request: {method} {url}")
+        
+        if "params" in kwargs and kwargs["params"]:
+            self.logger.debug(f"Params: {kwargs['params']}")
+            
+        if "json" in kwargs and kwargs["json"]:
+            # Truncate large JSON objects for readability
+            json_str = json.dumps(kwargs["json"])
+            if len(json_str) > 1000:
+                json_str = f"{json_str[:1000]}... (truncated)"
+            self.logger.debug(f"JSON: {json_str}")
     
-    def _handle_response(self, response: requests.Response) -> Dict[str, Any]:
-        """
-        Handle API response, raising appropriate exceptions if needed.
+    def _log_response(self, response: requests.Response):
+        """Log response details if debug mode is enabled."""
+        if not self.debug:
+            return
+            
+        self.logger.debug(f"Response: {response.status_code}")
         
-        Args:
-            response: Response object from requests
-            
-        Returns:
-            Parsed JSON response
-            
-        Raises:
-            requests.HTTPError: If the response status code indicates an error
-        """
-        response.raise_for_status()
-        
-        if response.status_code == 204:  # No content
-            return {}
-            
-        return response.json()
+        # Truncate large responses for readability
+        content = response.content.decode('utf-8', errors='replace')
+        if len(content) > 1000:
+            content = f"{content[:1000]}... (truncated)"
+        self.logger.debug(f"Content: {content}")
     
     def get(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
-        Send a GET request to the API.
+        Make a GET request to the Jira API.
         
         Args:
-            endpoint: API endpoint path
+            endpoint: API endpoint relative to the base URL
             params: Optional query parameters
             
         Returns:
-            Parsed JSON response
+            Response data as dictionary
         """
-        url = self._build_url(endpoint)
-        response = self.session.get(url, params=params, timeout=self.timeout)
-        return self._handle_response(response)
+        url = urljoin(self.base_url, endpoint)
+        self._log_request("GET", url, params=params)
+        
+        response = self.session.get(url, params=params)
+        self._log_response(response)
+        
+        response.raise_for_status()
+        return response.json()
     
-    def post(self, endpoint: str, json_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def post(self, endpoint: str, json_data: Optional[Dict[str, Any]] = None,
+            params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
-        Send a POST request to the API.
+        Make a POST request to the Jira API.
         
         Args:
-            endpoint: API endpoint path
-            json_data: JSON payload
+            endpoint: API endpoint relative to the base URL
+            json_data: Optional JSON data to send
+            params: Optional query parameters
             
         Returns:
-            Parsed JSON response
+            Response data as dictionary
         """
-        url = self._build_url(endpoint)
-        response = self.session.post(url, json=json_data, timeout=self.timeout)
-        return self._handle_response(response)
+        url = urljoin(self.base_url, endpoint)
+        self._log_request("POST", url, json=json_data, params=params)
+        
+        response = self.session.post(url, json=json_data, params=params)
+        self._log_response(response)
+        
+        response.raise_for_status()
+        return response.json()
     
-    def put(self, endpoint: str, json_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def put(self, endpoint: str, json_data: Optional[Dict[str, Any]] = None,
+           params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
-        Send a PUT request to the API.
+        Make a PUT request to the Jira API.
         
         Args:
-            endpoint: API endpoint path
-            json_data: JSON payload
+            endpoint: API endpoint relative to the base URL
+            json_data: Optional JSON data to send
+            params: Optional query parameters
             
         Returns:
-            Parsed JSON response
+            Response data as dictionary
         """
-        url = self._build_url(endpoint)
-        response = self.session.put(url, json=json_data, timeout=self.timeout)
-        return self._handle_response(response)
+        url = urljoin(self.base_url, endpoint)
+        self._log_request("PUT", url, json=json_data, params=params)
+        
+        response = self.session.put(url, json=json_data, params=params)
+        self._log_response(response)
+        
+        response.raise_for_status()
+        return response.json()
     
-    def delete(self, endpoint: str) -> Dict[str, Any]:
+    def delete(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> None:
         """
-        Send a DELETE request to the API.
+        Make a DELETE request to the Jira API.
         
         Args:
-            endpoint: API endpoint path
-            
-        Raises:
-            NotImplementedError: DELETE operations are not allowed
+            endpoint: API endpoint relative to the base URL
+            params: Optional query parameters
         """
-        raise NotImplementedError("DELETE operations are not allowed in this application")
+        url = urljoin(self.base_url, endpoint)
+        self._log_request("DELETE", url, params=params)
+        
+        response = self.session.delete(url, params=params)
+        self._log_response(response)
+        
+        response.raise_for_status()
 
 
-def get_client() -> JiraClient:
+def get_client(debug: bool = False) -> JiraClient:
     """
-    Factory function to create a configured Jira client instance.
+    Factory function to create a JiraClient from environment variables or configuration.
     
-    This function reads configuration from environment variables:
-    - JIRA_BASE_URL: Base URL of the Jira instance
-    - JIRA_API_TOKEN: API token for authentication
-    - JIRA_EMAIL: Email address for authentication
+    Checks for environment variables first, then falls back to configuration.
     
+    Args:
+        debug: Enable debug output
+        
     Returns:
         Configured JiraClient instance
-    
-    Raises:
-        ValueError: If required environment variables are missing
     """
-    base_url = os.environ.get('JIRA_BASE_URL')
-    api_token = os.environ.get('JIRA_API_TOKEN')
-    email = os.environ.get('JIRA_EMAIL')
+    auth_details = get_auth_details()
     
-    if not base_url:
-        raise ValueError("JIRA_BASE_URL environment variable is required")
-    
-    if email and api_token:
-        auth = HTTPBasicAuth(email, api_token)
-    elif api_token:
-        auth = {'token': api_token}
-    else:
-        raise ValueError("Either JIRA_API_TOKEN or both JIRA_EMAIL and JIRA_API_TOKEN must be set")
-    
-    return JiraClient(base_url=base_url, auth=auth)
+    return JiraClient(
+        base_url=auth_details['base_url'],
+        auth={'email': auth_details['email'], 'token': auth_details['token']},
+        debug=debug
+    )

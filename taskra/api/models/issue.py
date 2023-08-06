@@ -2,7 +2,7 @@
 
 from typing import Dict, List, Optional, Any, Union
 from datetime import datetime
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 
 class IssueType(BaseModel):
@@ -13,10 +13,7 @@ class IssueType(BaseModel):
     description: Optional[str] = None
     icon_url: Optional[str] = Field(None, alias="iconUrl")
     
-    class Config:
-        """Pydantic configuration."""
-        
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class StatusCategory(BaseModel):
@@ -36,10 +33,7 @@ class Status(BaseModel):
     description: Optional[str] = None
     status_category: Optional[StatusCategory] = Field(None, alias="statusCategory")
     
-    class Config:
-        """Pydantic configuration."""
-        
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class User(BaseModel):
@@ -50,10 +44,7 @@ class User(BaseModel):
     email_address: Optional[str] = Field(None, alias="emailAddress")
     active: Optional[bool] = None
     
-    class Config:
-        """Pydantic configuration."""
-        
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class DocNode(BaseModel):
@@ -63,10 +54,7 @@ class DocNode(BaseModel):
     content: Optional[List[Any]] = None
     text: Optional[str] = None
     
-    class Config:
-        """Pydantic configuration."""
-        
-        extra = "allow"
+    model_config = ConfigDict(extra="allow")
 
 
 class Document(BaseModel):
@@ -104,11 +92,7 @@ class IssueFields(BaseModel):
     issue_type: Optional[IssueType] = Field(None, alias="issuetype")
     priority: Optional[Dict[str, Any]] = None
     
-    class Config:
-        """Pydantic configuration."""
-        
-        populate_by_name = True
-        extra = "allow"  # Allow extra fields returned by the API
+    model_config = ConfigDict(populate_by_name=True, extra="allow")  # Allow extra fields returned by the API
 
 
 class Issue(IssueSummary):
@@ -116,10 +100,7 @@ class Issue(IssueSummary):
     
     fields: IssueFields
     
-    class Config:
-        """Pydantic configuration."""
-        
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class ProjectRef(BaseModel):
@@ -157,10 +138,7 @@ class IssueCreateFields(BaseModel):
     issuetype: IssueTypeRef
     description: Optional[DescriptionDoc] = None
     
-    class Config:
-        """Pydantic configuration."""
-        
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class IssueCreate(BaseModel):

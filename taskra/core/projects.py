@@ -12,7 +12,7 @@ def list_projects():
     """
     client = get_client()
     projects_service = ProjectsService(client)
-    projects = projects_service.list_projects()
+    projects = projects_service.list_all_projects()
     
     for project in projects:
         print(f"{project['key']}: {project['name']}")
