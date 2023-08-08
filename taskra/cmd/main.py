@@ -4,7 +4,10 @@ import click
 from rich.console import Console
 from rich.table import Table
 from rich import box
-from typing import Optional
+from rich.text import Text
+from rich.panel import Panel
+from rich.markdown import Markdown
+from typing import Optional, Dict, Any, List
 import os
 
 console = Console()
@@ -318,59 +321,57 @@ def issue(issue_key, json, debug, worklogs, start_date, end_date, all_time):
         
         # ===== SECTION: DESCRIPTION =====
         # Process description
-        desc_text = ""
+        rich_desc = None
         if "description" in fields and fields["description"]:
             description = fields["description"]
             
+            # Debug all content if requested
+            if debug and isinstance(description, dict):
+                console.print("[dim yellow]Description structure preview:[/dim yellow]")
+                try:
+                    import json as json_lib
+                    desc_preview = json_lib.dumps(description, indent=2)
+                    # Only show first few lines to avoid overwhelming output
+                    preview_lines = desc_preview.split("\n")[:10]
+                    if len(preview_lines) < len(desc_preview.split("\n")):
+                        preview_lines.append("  ... (truncated)")
+                    console.print("\n".join(preview_lines))
+                except Exception:
+                    console.print("[dim]Could not serialize description[/dim]")
+            
             # Handle different description formats
             if isinstance(description, str):
-                desc_text = description
+                rich_desc = Text(description)
             elif isinstance(description, dict):
                 if "content" in description:
-                    # Debug all content if requested
-                    if debug:
-                        console.print("[dim yellow]Description structure preview:[/dim yellow]")
-                        try:
-                            import json as json_lib
-                            desc_preview = json_lib.dumps(description, indent=2)
-                            # Only show first few lines to avoid overwhelming output
-                            preview_lines = desc_preview.split("\n")[:10]
-                            if len(preview_lines) < len(desc_preview.split("\n")):
-                                preview_lines.append("  ... (truncated)")
-                            console.print("\n".join(preview_lines))
-                        except Exception:
-                            console.print("[dim]Could not serialize description[/dim]")
+                    # Convert from Atlassian Document Format to Rich Text
+                    rich_desc = convert_adf_to_rich_text(description)
                     
-                    # Extract text from Atlassian Document Format
-                    desc_text = _extract_text_from_adf(description)
-                    
-                    if debug and desc_text:
-                        console.print(f"[dim yellow]Extracted description length:[/dim yellow] {len(desc_text)} characters")
-                        console.print(f"[dim yellow]Preview:[/dim yellow] '{desc_text[:100]}...'")
+                    if debug and rich_desc:
+                        console.print(f"[dim yellow]Extracted rich description[/dim yellow]")
                 elif "text" in description:
-                    desc_text = description["text"]
+                    rich_desc = Text(description["text"])
         
-        # Add the description section with compact spacing
-        if desc_text and desc_text.strip():
-            from rich.panel import Panel
-            from rich.text import Text
-            # Add the description content (if any) with improved spacing
-            description_content = f"[bold cyan]DESCRIPTION[/bold cyan]\n{desc_text}"
-            issue_table.add_row(description_content)
+        # Add the description section
+        # Use bold and underlined text for the section header instead of a panel
+        issue_table.add_row(Text("\nDESCRIPTION", style="bold underline"))
+        
+        if rich_desc:
+            issue_table.add_row(rich_desc)
         else:
-            issue_table.add_row("[bold cyan]DESCRIPTION[/bold cyan]\n[italic]No description provided[/italic]")
+            issue_table.add_row(Text("No description provided", style="italic"))
         
         # ===== SECTION: COMMENTS =====
         # Get comments for the issue
         try:
             comments = get_issue_comments(issue_key)
             
+            # Use bold and underlined text for the section header
+            issue_table.add_row(Text("\nCOMMENTS", style="bold underline"))
+            
             # Process comments
             if comments:
-                from rich.text import Text
-                
                 # Format all comments into a readable format
-                comment_text = "[bold cyan]COMMENTS[/bold cyan]\n\n"
                 for i, comment in enumerate(comments):
                     author = comment.get("author", {}).get("displayName", "Unknown")
                     created = comment.get("created", "Unknown date")
@@ -381,28 +382,34 @@ def issue(issue_key, json, debug, worklogs, start_date, end_date, all_time):
                         created = f"{parts[0]} {parts[1][:8]}"
                     
                     # Get comment body
-                    body = ""
+                    comment_content = None
                     if isinstance(comment.get("body"), str):
-                        body = comment.get("body")
+                        comment_content = Text(comment.get("body"))
                     elif isinstance(comment.get("body"), dict) and "content" in comment.get("body", {}):
-                        # Extract from Atlassian Document Format if needed
-                        body = _extract_text_from_adf(comment.get("body"))
+                        # Convert from Atlassian Document Format to Rich Text
+                        comment_content = convert_adf_to_rich_text(comment.get("body"))
                     
                     # Add a divider between comments except for the first one
                     if i > 0:
-                        comment_text += "\n" + "-" * 40 + "\n"
+                        issue_table.add_row(Text("-" * 40))
+                    
                     # Format the comment with author, date and content
-                    comment_text += f"[bold blue]{author}[/bold blue] commented on [italic]{created}[/italic]:\n\n"
-                    comment_text += body.strip() + "\n"
-                
-                # Add comments directly without a panel for more compact display
-                issue_table.add_row(comment_text)
+                    comment_header = Text()
+                    comment_header.append(author, style="bold blue")
+                    comment_header.append(" commented on ", style="default")
+                    comment_header.append(created, style="italic")
+                    
+                    issue_table.add_row(comment_header)
+                    if comment_content:
+                        issue_table.add_row(comment_content)
+                    else:
+                        issue_table.add_row(Text("No content", style="italic"))
             else:
-                issue_table.add_row("[bold cyan]COMMENTS[/bold cyan]\n[italic]No comments found[/italic]")
+                issue_table.add_row(Text("No comments found", style="italic"))
         except Exception as e:
             if debug:
                 console.print(f"[bold red]Error fetching comments:[/bold red] {str(e)}")
-            issue_table.add_row("[bold cyan]COMMENTS[/bold cyan]\n[italic]Error loading comments[/italic]")
+            issue_table.add_row(Text("Error loading comments", style="italic"))
         
         # Print the table
         console.print(issue_table)
@@ -458,6 +465,170 @@ def _extract_text_from_adf(doc):
     
     # Process the document from the top level
     return _process_node(doc).strip()
+
+def convert_adf_to_rich_text(doc: Dict[str, Any]) -> Text:
+    """Convert Atlassian Document Format to Rich Text with formatting.
+    
+    Args:
+        doc: The Atlassian Document Format document
+        
+    Returns:
+        Rich Text object with formatting preserved
+    """
+    if not doc or not isinstance(doc, dict):
+        return Text("No content")
+    
+    result = Text()
+    
+    def process_node(node: Dict[str, Any], parent_styles: List[str] = None) -> Optional[Text]:
+        """Process a node in the ADF and convert to Rich Text.
+        
+        Args:
+            node: The ADF node to process
+            parent_styles: Style strings inherited from parent nodes
+            
+        Returns:
+            Rich Text object with formatting
+        """
+        if not isinstance(node, dict):
+            return None
+        
+        # Initialize with parent styles or empty list
+        styles = parent_styles.copy() if parent_styles else []
+        node_text = Text()
+        node_type = node.get("type", "")
+        
+        # Handle text nodes with marks/formatting
+        if node_type == "text":
+            text_content = node.get("text", "")
+            if not text_content:
+                return None
+                
+            # Process text marks (bold, italic, etc.)
+            if "marks" in node and isinstance(node["marks"], list):
+                for mark in node["marks"]:
+                    mark_type = mark.get("type", "")
+                    
+                    if mark_type == "strong":
+                        styles.append("bold")
+                    elif mark_type == "em":
+                        styles.append("italic")
+                    elif mark_type == "strike":
+                        styles.append("strike")
+                    elif mark_type == "code":
+                        styles.append("on grey15")
+                        styles.append("bright_white")
+                    elif mark_type == "textColor" and "attrs" in mark:
+                        # Handle text color attribute
+                        color = mark["attrs"].get("color")
+                        if color:
+                            # Convert Atlassian color to closest Rich color
+                            styles.append(map_atlassian_color_to_rich(color))
+                    elif mark_type == "link" and "attrs" in mark:
+                        # Handle links
+                        href = mark["attrs"].get("href")
+                        if href:
+                            styles.append("blue")
+                            styles.append("underline")
+            
+            # Apply combined styles to the text
+            style_str = " ".join(styles)
+            return Text(text_content, style=style_str if style_str else None)
+            
+        # Container nodes that have content to process
+        elif "content" in node and isinstance(node.get("content"), list):
+            # Handle heading levels
+            if node_type.startswith("heading"):
+                try:
+                    level = int(node_type[-1])
+                    styles.append("bold")
+                    if level == 1:
+                        styles.append("bright_yellow")
+                        styles.append("underline")
+                    elif level == 2:
+                        styles.append("bright_yellow")
+                    elif level == 3:
+                        styles.append("yellow")
+                except (ValueError, IndexError):
+                    pass
+            
+            # Process all child nodes
+            for child in node.get("content", []):
+                child_text = process_node(child, styles)
+                if child_text:
+                    node_text.append(child_text)
+            
+            # Add appropriate formatting based on node type
+            if node_type in ["paragraph"]:
+                node_text.append("\n")
+            elif node_type in ["heading"]:
+                node_text.append("\n\n")
+            elif node_type == "list-item":
+                # Prepend bullet point to list items
+                bullet = Text("• ", style="dim")
+                return Text.assemble(bullet, node_text)
+            elif node_type == "hardBreak":
+                return Text("\n")
+            elif node_type == "rule":
+                return Text("\n" + "-" * 40 + "\n", style="dim")
+            
+        return node_text
+    
+    # Process the document from the top level    
+    if "content" in doc and isinstance(doc["content"], list):
+        for node in doc["content"]:
+            node_text = process_node(node)
+            if node_text:
+                result.append(node_text)
+    
+    return result
+
+def map_atlassian_color_to_rich(color: str) -> str:
+    """Map Atlassian color values to Rich color names.
+    
+    Args:
+        color: Atlassian color (e.g., "#ff0000" or "red")
+        
+    Returns:
+        Closest Rich color name
+    """
+    # Common color mappings
+    color_map = {
+        "#ff0000": "red",
+        "#00ff00": "green",
+        "#0000ff": "blue",
+        "#ffff00": "yellow",
+        "#00ffff": "cyan",
+        "#ff00ff": "magenta",
+        "#000000": "black",
+        "#ffffff": "white",
+        "#ff7f50": "orange_red",
+        "#800080": "purple",
+        "#008000": "green4",
+        "#a52a2a": "brown",
+        "#808080": "grey",
+        "#ffa500": "orange1"
+    }
+    
+    # Check if color is in our map
+    if color.lower() in color_map:
+        return color_map[color.lower()]
+    
+    # Try to match by hex value
+    if color.startswith("#"):
+        if color.lower() in color_map:
+            return color_map[color.lower()]
+        
+        # Default approximations for colors we don't have a direct mapping for
+        if color.startswith("#f"):  # Light colors
+            return "bright_white"
+        elif color.startswith("#0"):  # Dark blue/green shades
+            return "blue"
+        elif color.startswith("#8") or color.startswith("#7"):  # Mid-tones
+            return "grey"
+    
+    # Default fallback
+    return "default"
 
 @cli.command()
 @click.option("--username", "-u", help="Username to filter worklogs by (defaults to current user)")
