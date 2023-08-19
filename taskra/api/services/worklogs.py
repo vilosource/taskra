@@ -40,12 +40,83 @@ class WorklogService(BaseService):
         # Convert to API format
         payload = worklog_create.model_dump_api()
         
+        # Debug logging
+        logging.info(f"Adding worklog to issue {issue_key}")
+        logging.info(f"Payload: {payload}")
+        
         # Send request
         endpoint = self._get_endpoint(f"issue/{issue_key}/worklog")
-        response = self.client.post(endpoint, json=payload)
         
-        # Parse response to Worklog model
-        return Worklog.from_api(response)
+        try:
+            # Try using the client's post method
+            response = self.client.post(endpoint, json_data=payload)
+            # Parse response to Worklog model
+            return Worklog.from_api(response)
+        except Exception as e:
+            logging.error(f"Error adding worklog: {str(e)}")
+            logging.error(f"Request payload was: {payload}")
+            
+            # Try to extract more detailed error information
+            if hasattr(e, 'response') and e.response is not None:
+                try:
+                    error_response = e.response.json()
+                    logging.error(f"API error response: {error_response}")
+                    
+                    # Extract specific error messages if available
+                    if 'errorMessages' in error_response:
+                        for msg in error_response['errorMessages']:
+                            logging.error(f"API error message: {msg}")
+                    
+                    if 'errors' in error_response:
+                        for field, msg in error_response['errors'].items():
+                            logging.error(f"API field error - {field}: {msg}")
+                except Exception as json_err:
+                    # If we can't parse the JSON, try to get the raw response text
+                    try:
+                        raw_response = e.response.text
+                        logging.error(f"API raw error response: {raw_response}")
+                    except:
+                        logging.error("Could not extract API error response")
+            
+            # Try a direct approach with requests as a fallback
+            try:
+                import requests
+                import json
+                
+                logging.info("Attempting direct API call as fallback...")
+                
+                # Get authentication details from the client
+                auth = self.client.auth
+                headers = {
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
+                }
+                
+                # Make a direct request
+                direct_response = requests.post(
+                    self.client.base_url + endpoint,
+                    auth=auth,
+                    headers=headers,
+                    json=payload
+                )
+                
+                logging.info(f"Direct API call status code: {direct_response.status_code}")
+                
+                if direct_response.ok:
+                    logging.info("Direct API call succeeded!")
+                    return Worklog.from_api(direct_response.json())
+                else:
+                    logging.error(f"Direct API call failed with status {direct_response.status_code}")
+                    try:
+                        error_content = direct_response.json()
+                        logging.error(f"Direct API error response: {error_content}")
+                    except:
+                        logging.error(f"Direct API raw error response: {direct_response.text}")
+            except Exception as direct_err:
+                logging.error(f"Error in direct API call: {str(direct_err)}")
+            
+            # Re-raise the original exception
+            raise
     
     def list_worklogs(self, issue_key: str, start_at: int = 0, 
                       max_results: int = 50, get_all: bool = True) -> List[Worklog]:

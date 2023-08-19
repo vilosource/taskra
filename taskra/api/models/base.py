@@ -44,7 +44,21 @@ class BaseJiraModel(BaseModel):
         """
         # Ensure by_alias=True to get camelCase field names
         kwargs["by_alias"] = True
-        return self.model_dump(**kwargs)
+        
+        # Add datetime serialization
+        if "exclude_none" not in kwargs:
+            kwargs["exclude_none"] = True
+            
+        # Get the model as a dict
+        data = self.model_dump(**kwargs)
+        
+        # Handle datetime serialization
+        for key, value in list(data.items()):
+            if isinstance(value, datetime):
+                # Convert datetime to ISO format string for API compatibility
+                data[key] = value.isoformat()
+        
+        return data
     
     def model_dump_json_api(self, **kwargs) -> str:
         """

@@ -209,25 +209,113 @@ _taskra_completion() {
             esac
             ;;
         worklogs)
-            if [[ ${cur} == -* ]]; then
-                COMPREPLY=( $(compgen -W "--username -u --start -s --end -e --json -j --debug -d" -- ${cur}) )
+            # Check for subcommands
+            if [[ ${COMP_CWORD} -eq 2 ]]; then
+                COMPREPLY=( $(compgen -W "list add" -- ${cur}) )
+                return 0
             fi
-            # Handle option arguments
-            case "${prev}" in
-                --username|-u)
-                    # Could potentially fetch users from cache
-                    return 0
+            
+            # Handle subcommand options
+            local subcmd=${COMP_WORDS[2]}
+            case "${subcmd}" in
+                list)
+                    if [[ ${cur} == -* ]]; then
+                        COMPREPLY=( $(compgen -W "--username -u --start -s --end -e --json -j --debug -d --refresh-cache -r --timeout -t --verbose -v" -- ${cur}) )
+                    fi
+                    # Handle option arguments
+                    case "${prev}" in
+                        --username|-u)
+                            # Could potentially fetch users from cache
+                            return 0
+                            ;;
+                        --start|-s|--end|-e)
+                            # Date format suggestion
+                            COMPREPLY=( $(compgen -W "$(date +%Y-%m-%d)" -- ${cur}) )
+                            return 0
+                            ;;
+                        --debug|-d)
+                            COMPREPLY=( $(compgen -W "none error info verbose" -- ${cur}) )
+                            return 0
+                            ;;
+                    esac
                     ;;
-                --start|-s|--end|-e)
-                    # Date format suggestion
-                    COMPREPLY=( $(compgen -W "$(date +%Y-%m-%d)" -- ${cur}) )
-                    return 0
-                    ;;
-                --debug|-d)
-                    COMPREPLY=( $(compgen -W "none error info verbose" -- ${cur}) )
-                    return 0
+                add)
+                    # When we need an issue key
+                    if [[ ${prev} == "add" ]]; then
+                        # Get project keys from cache or command
+                        local project_keys=$(_taskra_cache_projects)
+                        
+                        if [[ -n "$project_keys" ]]; then
+                            # If user has started typing, filter completions
+                            if [[ ${cur} == *-* ]]; then
+                                # User has entered part of the issue key with a dash
+                                local project_prefix="${cur%%-*}"
+                                # Check if we match a specific project
+                                if echo "$project_keys" | grep -q "^$project_prefix$"; then
+                                    # If we have an exact match and user typed the dash, offer numbered completions
+                                    if [[ ${cur} == *-* ]]; then
+                                        # Generate some common issue numbers (1-20)
+                                        local issue_nums=$(seq -f "$project_prefix-%g" 1 20)
+                                        COMPREPLY=( $(compgen -W "$issue_nums" -- ${cur}) )
+                                    fi
+                                else
+                                    # Find any project key that matches what user has typed
+                                    COMPREPLY=( $(compgen -W "$(echo "$project_keys" | grep "^$project_prefix" | sed 's/$/-/')" -- ${cur}) )
+                                fi
+                            else
+                                # User is just starting to type - offer all project keys with dash
+                                local project_suggestions=""
+                                while read -r project; do
+                                    if [[ -n "$project" ]]; then
+                                        project_suggestions+="$project- "
+                                    fi
+                                done <<< "$project_keys"
+                                
+                                if [[ -n "$project_suggestions" ]]; then
+                                    COMPREPLY=( $(compgen -W "$project_suggestions" -- ${cur}) )
+                                else
+                                    # If no project keys are available after filtering
+                                    COMPREPLY=( $(compgen -W "<Type-Issue-Key>" -- ${cur}) )
+                                fi
+                            fi
+                        else
+                            # User-friendly hint if no projects found
+                            COMPREPLY=( $(compgen -W "<Type-Issue-Key>" -- ${cur}) )
+                        fi
+                        return 0
+                    fi
+                    
+                    # After issue key, suggest time formats
+                    if [[ ${COMP_CWORD} -eq 4 && ${COMP_WORDS[3]} != -* ]]; then
+                        COMPREPLY=( $(compgen -W "1h 30m 1h30m 2h 4h 8h" -- ${cur}) )
+                        return 0
+                    fi
+                    
+                    # Handle options for the add command
+                    if [[ ${cur} == -* ]]; then
+                        COMPREPLY=( $(compgen -W "--comment -c --date -d --time -t --json -j --debug" -- ${cur}) )
+                    fi
+                    
+                    # Handle option arguments
+                    case "${prev}" in
+                        --date|-d)
+                            # Date format suggestion
+                            COMPREPLY=( $(compgen -W "$(date +%Y-%m-%d)" -- ${cur}) )
+                            return 0
+                            ;;
+                        --time|-t)
+                            # Time format suggestion
+                            COMPREPLY=( $(compgen -W "$(date +%H:%M)" -- ${cur}) )
+                            return 0
+                            ;;
+                    esac
                     ;;
             esac
+            
+            # If no subcommand specified yet, handle options for the main command
+            if [[ ${COMP_CWORD} -eq 2 && ${cur} == -* ]]; then
+                COMPREPLY=( $(compgen -W "--username -u --start -s --end -e --json -j --debug -d --refresh-cache -r --timeout -t --verbose -v" -- ${cur}) )
+            fi
             ;;
         config)
             # Subcommands for config

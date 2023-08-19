@@ -112,7 +112,7 @@ def _to_json_serializable(obj):
     # Return primitive types and anything else as-is
     return obj
 
-def add_worklog(issue_key: str, time_spent: str, comment: Optional[str] = None) -> dict:
+def add_worklog(issue_key: str, time_spent: str, comment: Optional[str] = None, started: Optional[datetime] = None) -> dict:
     """
     Add a worklog entry to an issue.
     
@@ -120,6 +120,7 @@ def add_worklog(issue_key: str, time_spent: str, comment: Optional[str] = None) 
         issue_key: The issue key (e.g., PROJECT-123)
         time_spent: Time spent in format like '1h 30m'
         comment: Optional comment for the worklog
+        started: Optional datetime when the work was started (defaults to now)
         
     Returns:
         Dictionary representation of the created worklog
@@ -129,7 +130,7 @@ def add_worklog(issue_key: str, time_spent: str, comment: Optional[str] = None) 
     worklog_service = WorklogService(client)
     
     # Use the new model-based API
-    worklog_model = worklog_service.add_worklog(issue_key, time_spent, comment)
+    worklog_model = worklog_service.add_worklog(issue_key, time_spent, comment, started)
     logger.debug(f"Worklog added successfully to {issue_key}")
     
     # Convert the model to a dictionary for backward compatibility

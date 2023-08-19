@@ -30,6 +30,7 @@ class JiraClient:
             debug: Enable debug output
         """
         self.debug = debug
+        self.email = email  # Store email as an attribute for user identification
         
         # Ensure base URL ends with a trailing slash
         if not base_url.endswith('/'):

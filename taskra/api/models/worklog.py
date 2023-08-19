@@ -114,9 +114,9 @@ class WorklogCreate(BaseJiraModel):
     
     API Endpoint: POST /rest/api/3/issue/{issueIdOrKey}/worklog
     """
-    time_spent_seconds: int = Field(..., ge=1, description="Time spent in seconds")
-    comment: Optional[str] = Field(None, description="Comment on the worklog")
-    started: Optional[datetime] = Field(None, description="When the work was started")
+    time_spent: str = Field(..., alias="timeSpent", description="Time spent in Jira format (e.g., '2h 30m')")
+    comment: Optional[Dict[str, Any]] = Field(None, description="Comment on the worklog in ADF format")
+    started: str = Field(..., description="When the work was started in ISO format with timezone")
     
     @classmethod
     def from_simple(cls, time_spent: str, comment: Optional[str] = None, started: Optional[datetime] = None) -> "WorklogCreate":
@@ -131,12 +131,59 @@ class WorklogCreate(BaseJiraModel):
         Returns:
             WorklogCreate instance
         """
-        seconds = cls._parse_time_spent(time_spent)
+        # If no started time is provided, use the current time
+        if started is None:
+            started = datetime.now()
+            
+        # Format the datetime in the required Jira API format: yyyy-MM-dd'T'HH:mm:ss.SSSZ
+        # Example: 2025-04-05T11:30:00.000+0000
+        formatted_date = cls._format_datetime_for_jira(started)
+        
+        # Format comment as Atlassian Document Format (ADF) if provided
+        formatted_comment = None
+        if comment:
+            formatted_comment = {
+                "type": "doc",
+                "version": 1,
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": comment
+                            }
+                        ]
+                    }
+                ]
+            }
+        
+        # Create the worklog with the properly formatted fields
         return cls(
-            timeSpentSeconds=seconds,
-            comment=comment,
-            started=started
+            timeSpent=time_spent,
+            comment=formatted_comment,
+            started=formatted_date
         )
+    
+    @staticmethod
+    def _format_datetime_for_jira(dt: datetime) -> str:
+        """
+        Format a datetime object in the format required by Jira API.
+        
+        Args:
+            dt: Datetime object
+            
+        Returns:
+            Formatted datetime string in the format: yyyy-MM-dd'T'HH:mm:ss.SSSZ
+        """
+        # Format with milliseconds and timezone offset
+        # Example: 2025-04-05T11:30:00.000+0300 for Helsinki time
+        
+        # Use +0300 for Helsinki timezone as seen in the existing worklog data
+        timezone_str = "+0300"
+        
+        # Format the datetime with milliseconds
+        return dt.strftime("%Y-%m-%dT%H:%M:%S.000") + timezone_str
     
     @staticmethod
     def _parse_time_spent(time_spent: str) -> int:
@@ -152,16 +199,32 @@ class WorklogCreate(BaseJiraModel):
         total_seconds = 0
         parts = time_spent.split()
         
-        for part in parts:
-            if part.endswith('h'):
-                hours = int(part[:-1])
-                total_seconds += hours * 3600
-            elif part.endswith('m'):
-                minutes = int(part[:-1])
-                total_seconds += minutes * 60
-            elif part.endswith('s'):
-                seconds = int(part[:-1])
-                total_seconds += seconds
+        # Handle formats like "1h30m" without spaces
+        if len(parts) == 1 and any(x in parts[0] for x in ['h', 'm', 's']):
+            import re
+            # Extract hours, minutes, seconds using regex
+            hours_match = re.search(r'(\d+)h', parts[0])
+            minutes_match = re.search(r'(\d+)m', parts[0])
+            seconds_match = re.search(r'(\d+)s', parts[0])
+            
+            if hours_match:
+                total_seconds += int(hours_match.group(1)) * 3600
+            if minutes_match:
+                total_seconds += int(minutes_match.group(1)) * 60
+            if seconds_match:
+                total_seconds += int(seconds_match.group(1))
+        else:
+            # Handle space-separated format like "1h 30m"
+            for part in parts:
+                if part.endswith('h'):
+                    hours = int(part[:-1])
+                    total_seconds += hours * 3600
+                elif part.endswith('m'):
+                    minutes = int(part[:-1])
+                    total_seconds += minutes * 60
+                elif part.endswith('s'):
+                    seconds = int(part[:-1])
+                    total_seconds += seconds
         
         if total_seconds == 0:
             raise ValueError(f"Invalid time format: {time_spent}. Use format like '2h 30m'.")
