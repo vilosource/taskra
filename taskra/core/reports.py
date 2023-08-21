@@ -110,6 +110,73 @@ def generate_project_tickets_report(filters: Dict[str, Any], max_results: int = 
         raise
 
 
+def generate_cross_project_report(project_keys: List[str], filters: Dict[str, Any] = None, debug: bool = False) -> Dict[str, Any]:
+    """
+    Generate a report that spans multiple projects.
+    
+    Args:
+        project_keys: List of project keys to include in the report
+        filters: Optional filters to apply
+        debug: Enable debug output
+        
+    Returns:
+        Processed report data
+    """
+    if filters is None:
+        filters = {}
+        
+    if debug:
+        print(f"[DEBUG] Generating cross-project report for projects: {project_keys}")
+    
+    try:
+        # Get the API client
+        client = get_client(debug=debug)
+        report_service = ReportService(client)
+        
+        # Generate the raw report
+        raw_report = report_service.cross_project_report(project_keys, filters, debug)
+        
+        # Process and enhance the report data
+        processed_report = {
+            "projects": {},
+            "summary": raw_report["summary"]
+        }
+        
+        # Process each project's data
+        for project_key, project_data in raw_report["projects"].items():
+            processed_issues = []
+            
+            for issue in project_data.get("issues", []):
+                fields = issue.get("fields", {})
+                
+                # Process issue data (similar to other report processing)
+                processed_issue = {
+                    "key": issue.get("key", ""),
+                    "summary": fields.get("summary", "No summary"),
+                    "status": _extract_status_name(fields),
+                    "assignee": _extract_assignee_name(fields),
+                    "created": _format_date(fields.get("created", "")),
+                }
+                processed_issues.append(processed_issue)
+            
+            # Store processed issues back in the result
+            processed_project = {
+                "name": project_data["name"],
+                "issues_count": project_data["issues_count"],
+                "issues": processed_issues
+            }
+            processed_report["projects"][project_key] = processed_project
+        
+        return processed_report
+        
+    except Exception as e:
+        if debug:
+            print(f"[DEBUG] Exception in generate_cross_project_report: {str(e)}")
+            import traceback
+            print(f"[DEBUG] Traceback: {traceback.format_exc()}")
+        raise
+
+
 def _format_date(date_str: str) -> str:
     """Format a date string for display."""
     if not date_str:
@@ -155,3 +222,17 @@ def _matches_user(author: Dict[str, Any], username: str) -> bool:
     return (username in display_name or 
             username in name or 
             username in email)
+
+
+def _extract_status_name(fields):
+    status_obj = fields.get("status")
+    if status_obj and isinstance(status_obj, dict):
+        return status_obj.get("name", "Unknown")
+    return "Unknown"
+
+
+def _extract_assignee_name(fields):
+    assignee_obj = fields.get("assignee")
+    if assignee_obj and isinstance(assignee_obj, dict):
+        return assignee_obj.get("displayName", "Unknown")
+    return "Unassigned"

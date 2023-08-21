@@ -5,6 +5,7 @@ import logging
 
 from .base import BaseService
 from .issues import IssuesService
+from .projects import ProjectsService
 
 
 class ReportService(BaseService):
@@ -102,3 +103,56 @@ class ReportService(BaseService):
         jql += f" ORDER BY {sort_field} {sort_order}"
             
         return jql
+    
+    def cross_project_report(self, project_keys: List[str], filters: Dict[str, Any], debug: bool = False) -> Dict[str, Any]:
+        """
+        Generate a report spanning multiple projects.
+        
+        Args:
+            project_keys: List of project keys to include in the report
+            filters: Dictionary of filters to apply
+            debug: Enable debug output
+            
+        Returns:
+            Report data dictionary with combined results
+        """
+        if debug:
+            self.logger.debug(f"Generating cross-project report for projects: {project_keys}")
+            
+        # Access other services as needed
+        projects_service = ProjectsService(self.client)
+        issues_service = IssuesService(self.client)
+        
+        # Collect data from multiple sources
+        result = {
+            "projects": {},
+            "summary": {
+                "total_issues": 0,
+                "projects_count": len(project_keys)
+            }
+        }
+        
+        # Process each project
+        for project_key in project_keys:
+            if debug:
+                self.logger.debug(f"Processing project: {project_key}")
+                
+            # Get project details
+            project_data = projects_service.get_project(project_key)
+            
+            # Create JQL for this project's issues
+            jql = self._build_jql_for_project_tickets({**filters, "project": project_key})
+            
+            # Get issues for this project
+            issues = issues_service.search_all_issues(jql)
+            
+            # Store in results
+            result["projects"][project_key] = {
+                "name": project_data.get("name", "Unknown"),
+                "issues_count": len(issues),
+                "issues": issues
+            }
+            
+            result["summary"]["total_issues"] += len(issues)
+        
+        return result

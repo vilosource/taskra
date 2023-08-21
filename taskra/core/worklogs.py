@@ -1,9 +1,60 @@
 """Worklog management functionality."""
 
 import logging
+from datetime import datetime, date, time
 from ..api.services.worklogs import WorklogService
 from ..api.client import get_client
 from ..utils.cache import generate_cache_key, get_from_cache, save_to_cache
+
+def _to_json_serializable(obj):
+    """Convert Pydantic models and other non-JSON serializable objects to JSON serializable dictionaries."""
+    # Check for Pydantic models
+    if hasattr(obj, 'model_dump'):
+        # For Pydantic v2+
+        # Preserve original field names by using by_alias=True
+        result = obj.model_dump(by_alias=True)
+        # Process the result to handle datetime objects
+        return _to_json_serializable(result)
+    elif hasattr(obj, 'dict'):
+        # For Pydantic v1
+        # Preserve original field names by using by_alias=True
+        result = obj.dict(by_alias=True)
+        # Process the result to handle datetime objects
+        return _to_json_serializable(result)
+    
+    # Check for datetime objects
+    if isinstance(obj, (datetime, date, time)):
+        # Convert datetime to ISO format string
+        return obj.isoformat()
+    
+    # Check for other datetime-like objects
+    if hasattr(obj, 'isoformat') and callable(obj.isoformat):
+        return obj.isoformat()
+    
+    # Handle collections
+    if isinstance(obj, list):
+        return [_to_json_serializable(item) for item in obj]
+    elif isinstance(obj, dict):
+        # Special handling for worklog entries to preserve critical fields
+        if "author" in obj and isinstance(obj["author"], dict):
+            # Ensure author.displayName exists in the result
+            if "display_name" in obj["author"] and "displayName" not in obj["author"]:
+                obj["author"]["displayName"] = obj["author"]["display_name"]
+        
+        # Ensure timeSpent exists in the result
+        if "time_spent" in obj and "timeSpent" not in obj:
+            obj["timeSpent"] = obj["time_spent"]
+        
+        # Ensure timeSpentSeconds exists
+        if "time_spent_seconds" in obj and "timeSpentSeconds" not in obj:
+            obj["timeSpentSeconds"] = obj["time_spent_seconds"]
+        
+        return {k: _to_json_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, tuple):
+        return tuple(_to_json_serializable(item) for item in obj)
+    
+    # Return primitive types and anything else as-is
+    return obj
 
 def add_worklog(issue_key, time_spent, comment=None):
     """Add a worklog entry to an issue."""
@@ -38,10 +89,11 @@ def list_worklogs(issue_key, refresh_cache=False):
     worklog_service = WorklogService(client)
     worklogs = worklog_service.list_worklogs(issue_key)
     
-    # Save to cache for future use
-    save_to_cache(cache_key, worklogs)
+    # Convert to JSON-serializable format before saving to cache
+    serializable_worklogs = _to_json_serializable(worklogs)
+    save_to_cache(cache_key, serializable_worklogs)
     
-    return worklogs
+    return serializable_worklogs
 
 def get_user_worklogs(username=None, start_date=None, end_date=None, debug_level='none', refresh_cache=False):
     """
@@ -87,7 +139,8 @@ def get_user_worklogs(username=None, start_date=None, end_date=None, debug_level
         debug_level=debug_level
     )
     
-    # Save to cache for future use
-    save_to_cache(cache_key, worklogs)
+    # Convert to JSON-serializable format before saving to cache
+    serializable_worklogs = _to_json_serializable(worklogs)
+    save_to_cache(cache_key, serializable_worklogs)
     
-    return worklogs
+    return serializable_worklogs

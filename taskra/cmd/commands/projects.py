@@ -1,7 +1,7 @@
 """Projects command implementation."""
 
 import click
-import json
+import os
 from rich.console import Console
 
 # Create console for rich text formatting
@@ -14,6 +14,7 @@ def projects_cmd(json_output, debug):
     """List available projects."""
     # Import inside function to avoid circular imports
     from ...core import list_projects
+    from ...presentation import render_projects, render_error
     
     if debug:
         console.print("[yellow]Debug mode enabled[/yellow]")
@@ -22,30 +23,12 @@ def projects_cmd(json_output, debug):
         # Get projects list - don't pass debug parameter as it's not supported
         projects_list = list_projects()
         
-        # If JSON flag is provided, output raw JSON
-        if json_output:
-            # Output as JSON format
-            console.print(json.dumps(projects_list, indent=2))
-            return
-        
-        # Otherwise, continue with standard output
-        console.print("[bold blue]Available Projects:[/bold blue]")
-        
-        # Display each project
-        for project in projects_list:
-            key = project.get("key", "Unknown")
-            name = project.get("name", "Unnamed")
-            console.print(f"{key}: {name}")
-        
-        console.print(f"\nTotal projects: [bold]{len(projects_list)}[/bold]")
+        # Delegate presentation to separate service
+        render_projects(projects_list, format="json" if json_output else "table")
     
     except Exception as e:
-        console.print(f"[bold red]Error:[/bold red] {str(e)}")
-        if debug:
-            import traceback
-            console.print("[bold red]Traceback:[/bold red]")
-            console.print(traceback.format_exc())
+        # Delegate error handling to presentation layer
+        render_error(e, debug)
         # Re-raise exception if not in testing mode
-        import os
         if os.environ.get("TASKRA_TESTING") != "1":
             raise

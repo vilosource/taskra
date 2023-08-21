@@ -107,6 +107,84 @@ def projects_cmd(json_output, debug):
 
 This separation would better adhere to SRP by giving each component a single reason to change.
 
+#### SRP Violation Example: The `issue_cmd` Command
+
+The current implementation of the `issue_cmd` function also violates SRP:
+
+```python
+@click.command("issue")
+@click.argument("issue_key")
+@click.option("--json", "-j", is_flag=True, help="Output raw JSON")
+@click.option("--debug", "-d", is_flag=True, help="Show debug information")
+def issue_cmd(issue_key, json, debug):
+    """Get information about a specific issue."""
+    from ...core import get_issue
+    
+    try:
+        # Call business logic
+        issue_data = get_issue(issue_key)
+        
+        # Handle presentation logic
+        if json:
+            import json as json_lib
+            console.print(json_lib.dumps(issue_data, indent=2))
+        else:
+            # Complex formatting logic for displaying issue data
+            console.print(f"[bold blue]Issue {issue_key}[/bold blue]")
+            # ...more formatting code...
+    except Exception as e:
+        # Error handling logic
+        console.print(f"[bold red]Error:[/bold red] {str(e)}")
+        # ...more error handling...
+```
+
+#### Improved Design with SRP
+
+A better approach would be to refactor this into:
+
+1. A command handler that only handles CLI arguments:
+
+```python
+@click.command("issue")
+@click.argument("issue_key")
+@click.option("--format", "-f", type=click.Choice(["table", "json"]), default="table")
+@click.option("--debug", "-d", is_flag=True, help="Show debug information")
+def issue_cmd(issue_key, format, debug):
+    """Get information about a specific issue."""
+    from ...core import get_issue
+    from ...presentation import render_issue, render_error
+    
+    try:
+        # Call business logic only
+        issue_data = get_issue(issue_key)
+        
+        # Delegate presentation to a separate service
+        render_issue(issue_data, format=format)
+    except Exception as e:
+        # Delegate error handling to a separate service
+        render_error(e, debug=debug)
+```
+
+2. A presentation service that handles formatting and display:
+
+```python
+# presentation/renderers.py
+def render_issue(issue_data, format="table"):
+    """Render issue data in the specified format."""
+    if format == "json":
+        import json
+        console.print(json.dumps(issue_data, indent=2))
+    else:
+        # Table formatting logic separated from command handling
+        _display_issue_table(issue_data)
+```
+
+This separation:
+1. Makes the code more maintainable (changes to formatting don't affect command logic)
+2. Enhances testability (can test formatting separately from command handling)
+3. Improves reusability (presentation logic can be used by multiple commands)
+4. Adheres to the Single Responsibility Principle
+
 #### 2. Core Layer (Business Logic)
 
 The command calls `list_projects()` from the core module (`core/projects.py`):
@@ -304,3 +382,38 @@ The service uses `JiraClient` from `api/client.py`.
 #### Benefits of This Architecture
 
 The same benefits apply to the reports functionality, ensuring consistency and adherence to SOLID principles.
+
+### Implementing Reports in Taskra
+
+Reports in TaskRa demonstrate the power of our layered architecture when combining data from multiple services. Let's examine how they work across the different layers:
+
+#### 1. Service Layer (`ReportService`)
+
+In the service layer, the `ReportService` class acts as a coordinator that combines data from other services:
+
+```python
+class ReportService(BaseService):
+    """Service for generating Jira reports."""
+    
+    def cross_project_report(self, project_keys: List[str], filters: Dict[str, Any], debug: bool = False) -> Dict[str, Any]:
+        # Access other services as needed
+        projects_service = ProjectsService(self.client)
+        issues_service = IssuesService(self.client)
+        
+        # Process each project
+        for project_key in project_keys:
+            # Get project details from ProjectsService
+            project_data = projects_service.get_project(project_key)
+            
+            # Get issues from IssuesService
+            jql = self._build_jql_for_project_tickets({**filters, "project": project_key})
+            issues = issues_service.search_all_issues(jql)
+            
+            # Combine data into report structure
+            # ...
+```
+
+**SOLID Principles Applied:**
+- **SRP:** The service has a single responsibility - generating reports
+- **OCP:** New report types can be added without changing existing ones
+- **DIP:** The service depends on abstractions (other services) rather than concrete implementations
