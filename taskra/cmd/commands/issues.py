@@ -8,6 +8,7 @@ from rich.table import Table
 from rich import box
 from rich.text import Text
 from typing import Dict, Any
+import requests
 
 from ..utils.formatting import convert_adf_to_rich_text
 
@@ -89,6 +90,11 @@ def issue_cmd(issue_key, json, debug, worklogs, start_date, end_date, all_time):
         
         # Print the table
         console.print(issue_table)
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 404:
+            console.print(f"[bold red]Error:[/bold red] Issue not found (404)")
+        else:
+            raise
     except Exception as e:
         console.print(f"[bold red]Error:[/bold red] {str(e)}")
         if debug:
@@ -99,12 +105,67 @@ def issue_cmd(issue_key, json, debug, worklogs, start_date, end_date, all_time):
         if os.environ.get("TASKRA_TESTING") != "1":
             raise
 
-def _display_worklogs(issue_key, start_date, end_date, all_time, debug):
+@click.command("issues")
+@click.argument("issue_key", required=True)
+@click.option("--json", "-j", is_flag=True, help="Output raw JSON")
+@click.option("--worklogs", "-w", is_flag=True, help="Include worklogs")
+@click.option("--start", "-s", help="Start date for worklogs in format YYYY-MM-DD")
+@click.option("--end", "-e", help="End date for worklogs in format YYYY-MM-DD")
+@click.option("--all-time", "-a", is_flag=True, help="Show all worklogs (no date filtering)")
+@click.option("--debug", "-d", is_flag=True, help="Show debug information")
+@click.option("--refresh-cache", "-r", is_flag=True, help="Force refresh of cached worklog data")
+def issues_cmd(issue_key, json, worklogs, start, end, all_time, debug, refresh_cache):
+    """Get details for a specific issue by key."""
+    # Import here for cleaner testing
+    from ...core import get_issue, list_worklogs
+    import datetime
+    
+    try:
+        if json:
+            # If JSON flag is provided, output raw JSON
+            import json as json_lib
+            issue_data = get_issue(issue_key)
+            console.print(json_lib.dumps(issue_data, indent=2, default=str))
+            return
+            
+        console.print(f"[bold blue]Issue {issue_key}[/bold blue]")
+        issue_data = get_issue(issue_key)
+        fields = issue_data.get("fields", {})
+        
+        # Handle worklog display if the flag is set
+        if worklogs:
+            _display_worklogs(issue_key, start, end, all_time, debug, refresh_cache)
+            
+            # If only worklogs are requested, return now
+            if json or not worklogs:
+                return
+        
+        # Get the summary for the title
+        summary = fields.get("summary", "No summary provided")
+        
+        # Print the summary
+        console.print(f"[bold cyan]Summary:[/bold cyan] {summary}")
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 404:
+            console.print(f"[bold red]Error:[/bold red] Issue not found (404)")
+        else:
+            raise
+    except Exception as e:
+        console.print(f"[bold red]Error:[/bold red] {str(e)}")
+        if debug:
+            import traceback
+            console.print("[bold red]Traceback:[/bold red]")
+            console.print(traceback.format_exc())
+        # Don't propagate the exception during testing
+        if os.environ.get("TASKRA_TESTING") != "1":
+            raise
+
+def _display_worklogs(issue_key, start_date, end_date, all_time, debug, refresh_cache=False):
     """Display worklogs for an issue."""
     from ...core import list_worklogs
     import datetime
     
-    # If all-time flag is set, don't filter by date range
+    # If all-time flag is set, don't filter by date range (no date filtering)
     if all_time:
         start_date = None
         end_date = None
@@ -120,12 +181,14 @@ def _display_worklogs(issue_key, start_date, end_date, all_time, debug):
         if not end_date:
             # Default to today
             end_date = datetime.datetime.now().strftime("%Y-%m-%d")
-            
         if debug:
             console.print(f"[yellow]Fetching worklogs from {start_date} to {end_date}[/yellow]")
         
+    if refresh_cache and debug:
+        console.print("[yellow]Refreshing worklog cache...[/yellow]")
+        
     # Get worklogs for this issue
-    issue_worklogs = list_worklogs(issue_key)
+    issue_worklogs = list_worklogs(issue_key, refresh_cache=refresh_cache)
     
     # Filter by date range if dates are specified
     filtered_worklogs = []
@@ -160,21 +223,27 @@ def _display_worklog_table(worklogs, issue_key):
     
     table = Table(title=f"Worklogs for {issue_key}")
     table.add_column("Date", style="cyan")
+    table.add_column("Time", style="cyan")  # New column for time
     table.add_column("Author", style="yellow")
     table.add_column("Time Spent", style="magenta")
     table.add_column("Comment", style="blue")
     
     total_seconds = 0
     for worklog in worklogs:
-        # Format the date
+        # Format the date and time separately
         date_str = ""
+        time_str = ""
         if "started" in worklog:
             started = worklog["started"]
             if isinstance(started, datetime.datetime):
-                date_str = started.strftime("%Y-%m-%d %H:%M")
+                date_str = started.strftime("%Y-%m-%d")
+                time_str = started.strftime("%H:%M")
             elif isinstance(started, str) and "T" in started:
                 parts = started.split("T")
-                date_str = f"{parts[0]} {parts[1][:5]}"
+                date_str = parts[0]
+                # Extract time portion (remove timezone if present)
+                time_part = parts[1].split("+")[0].split(".")[0]
+                time_str = time_part[:5]  # Just take HH:MM
         
         # Get author name
         author = worklog.get("author", {}).get("displayName", "")
@@ -186,7 +255,7 @@ def _display_worklog_table(worklogs, issue_key):
         # Get comment if it exists
         comment = _extract_worklog_comment(worklog)
         
-        table.add_row(date_str, author, time_spent, comment)
+        table.add_row(date_str, time_str, author, time_spent, comment)
     
     console.print(table)
     
@@ -244,9 +313,9 @@ def _format_issue_details(fields: Dict[str, Any], debug: bool = False) -> str:
         if isinstance(issuetype_data, dict):
             # Try all possible field names for the name of the issue type
             issue_type = (issuetype_data.get("name") or 
-                         issuetype_data.get("value") or 
                          issuetype_data.get("displayName") or 
                          issuetype_data.get("display_name") or 
+                         issuetype_data.get("value") or 
                          "Unknown")
         elif isinstance(issuetype_data, str):
             issue_type = issuetype_data
@@ -305,7 +374,6 @@ def _format_issue_details(fields: Dict[str, Any], debug: bool = False) -> str:
     # Format dates
     created_str = "Unknown"
     updated_str = "Unknown"
-    
     if "created" in fields and fields["created"]:
         created_date = fields["created"]
         # Handle datetime object
@@ -317,7 +385,6 @@ def _format_issue_details(fields: Dict[str, Any], debug: bool = False) -> str:
             created_str = f"{parts[0]} {parts[1][:8]}"
         else:
             created_str = str(created_date)
-            
     if "updated" in fields and fields["updated"]:
         updated_date = fields["updated"]
         # Handle datetime object
@@ -373,16 +440,15 @@ def _add_description_to_table(issue_table, fields, debug):
             if "content" in description:
                 # Convert from Atlassian Document Format to Rich Text
                 rich_desc = convert_adf_to_rich_text(description)
+            elif "text" in description:
+                rich_desc = Text(description["text"])
                 
                 if debug and rich_desc:
                     console.print(f"[dim yellow]Extracted rich description[/dim yellow]")
-            elif "text" in description:
-                rich_desc = Text(description["text"])
     
     # Add the description section
     # Use bold and underlined text for the section header instead of a panel
     issue_table.add_row(Text("\nDESCRIPTION", style="bold underline"))
-    
     if rich_desc:
         issue_table.add_row(rich_desc)
     else:
@@ -391,7 +457,6 @@ def _add_description_to_table(issue_table, fields, debug):
 def _add_comments_to_table(issue_table, issue_key, debug):
     """Add comments section to the issue table."""
     from ...core import get_issue_comments
-    
     try:
         comments = get_issue_comments(issue_key)
         
@@ -427,7 +492,6 @@ def _add_comments_to_table(issue_table, issue_key, debug):
                 comment_header.append(author, style="bold blue")
                 comment_header.append(" commented on ", style="default")
                 comment_header.append(created, style="italic")
-                
                 issue_table.add_row(comment_header)
                 if comment_content:
                     issue_table.add_row(comment_content)
@@ -436,6 +500,6 @@ def _add_comments_to_table(issue_table, issue_key, debug):
         else:
             issue_table.add_row(Text("No comments found", style="italic"))
     except Exception as e:
+        issue_table.add_row(Text("Error loading comments", style="italic"))
         if debug:
             console.print(f"[bold red]Error fetching comments:[/bold red] {str(e)}")
-        issue_table.add_row(Text("Error loading comments", style="italic"))
