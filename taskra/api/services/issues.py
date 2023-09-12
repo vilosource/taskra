@@ -119,3 +119,70 @@ class IssuesService(BaseService):
                 break
         
         return all_comments
+
+    def search_issues(self, jql: str, fields: Optional[List[str]] = None, 
+                      start_at: int = 0, max_results: int = 50) -> Dict[str, Any]:
+        """
+        Search for issues using JQL.
+        
+        Args:
+            jql: JQL query string
+            fields: List of fields to include
+            start_at: Index of the first result
+            max_results: Maximum number of results to return
+            
+        Returns:
+            Search results
+        """
+        params = {
+            "jql": jql,
+            "startAt": start_at,
+            "maxResults": max_results
+        }
+        
+        if fields:
+            params["fields"] = ",".join(fields)
+        
+        response = self.client.get(self._get_endpoint("search"), params=params)
+        return response
+    
+    def search_all_issues(self, jql: str, fields: Optional[List[str]] = None,
+                          max_results_per_page: int = 50) -> List[Dict[str, Any]]:
+        """
+        Search for all issues matching JQL, handling pagination.
+        
+        Args:
+            jql: JQL query string
+            fields: List of fields to include
+            max_results_per_page: Maximum results per request
+            
+        Returns:
+            List of all matching issues
+        """
+        all_issues = []
+        start_at = 0
+        total = None
+        
+        while total is None or start_at < total:
+            response = self.search_issues(
+                jql=jql, 
+                fields=fields, 
+                start_at=start_at, 
+                max_results=max_results_per_page
+            )
+            
+            issues = response.get("issues", [])
+            all_issues.extend(issues)
+            
+            # If this is the first request, get the total count
+            if total is None:
+                total = response.get("total", 0)
+            
+            # Update the start_at parameter for the next page
+            start_at += len(issues)
+            
+            # If we got fewer results than requested, we're done
+            if len(issues) < max_results_per_page:
+                break
+        
+        return all_issues

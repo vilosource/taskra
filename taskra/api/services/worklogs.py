@@ -39,20 +39,72 @@ class WorklogService(BaseService):
         
         return response
     
-    def list_worklogs(self, issue_key: str) -> List[Dict[str, Any]]:
+    def list_worklogs(self, issue_key: str, start_at: int = 0, 
+                      max_results: int = 50, get_all: bool = True) -> List[Dict[str, Any]]:
         """
-        Get all worklogs for an issue.
+        Get worklogs for an issue with pagination support.
         
         Args:
             issue_key: The issue key (e.g., PROJECT-123)
+            start_at: Index of the first worklog to return (for pagination)
+            max_results: Maximum number of worklogs to return per request
+            get_all: If True, retrieve all worklogs by handling pagination automatically
             
         Returns:
             List of worklog data dictionaries
         """
-        response = self.client.get(self._get_endpoint(f"issue/{issue_key}/worklog"))
+        if get_all:
+            return self._get_all_worklogs(issue_key, max_results_per_page=max_results)
+        
+        params = {
+            "startAt": start_at,
+            "maxResults": max_results
+        }
+        
+        response = self.client.get(self._get_endpoint(f"issue/{issue_key}/worklog"), params=params)
         worklog_list = WorklogList.model_validate(response)
         
         return worklog_list.worklogs
+    
+    def _get_all_worklogs(self, issue_key: str, max_results_per_page: int = 50) -> List[Dict[str, Any]]:
+        """
+        Get all worklogs for an issue by handling pagination.
+        
+        Args:
+            issue_key: The issue key
+            max_results_per_page: Maximum number of worklogs to return per request
+            
+        Returns:
+            Complete list of worklog data dictionaries
+        """
+        all_worklogs = []
+        start_at = 0
+        total = None
+        
+        while total is None or start_at < total:
+            params = {
+                "startAt": start_at,
+                "maxResults": max_results_per_page
+            }
+            
+            response = self.client.get(self._get_endpoint(f"issue/{issue_key}/worklog"), params=params)
+            worklog_list = WorklogList.model_validate(response)
+            worklogs = worklog_list.worklogs
+            
+            all_worklogs.extend(worklogs)
+            
+            # If this is the first request, get the total count
+            if total is None:
+                total = worklog_list.total
+            
+            # Update the start_at parameter for the next page
+            start_at += len(worklogs)
+            
+            # If we got fewer results than requested, we're done
+            if len(worklogs) < max_results_per_page:
+                break
+        
+        return all_worklogs
     
     def get_user_worklogs(self, username: Optional[str] = None, 
                           start_date: Optional[str] = None, 

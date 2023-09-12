@@ -97,8 +97,15 @@ class JiraClient:
         response = self.session.get(url, params=params)
         self._log_response(response)
         
-        response.raise_for_status()
-        return response.json()
+        try:
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.HTTPError as e:
+            if self.debug:
+                print(f"[DEBUG] HTTP error: {str(e)}")
+                print(f"[DEBUG] Response content: {response.content.decode('utf-8', errors='replace')}")
+                print(f"[DEBUG] Status code: {response.status_code}")
+            raise
     
     def post(self, endpoint: str, json_data: Optional[Dict[str, Any]] = None,
             params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
