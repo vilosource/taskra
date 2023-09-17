@@ -48,14 +48,34 @@ def issue(issue_key, json, debug):
         issue_data = get_issue(issue_key)
         fields = issue_data.get("fields", {})
         
-        # Create a single table with HEAVY borders for improved visibility
-        # Use a single column layout
-        issue_table = Table(box=box.DOUBLE_EDGE, show_header=False, expand=True, padding=1)
-        issue_table.add_column("Content", style="green")  # Single column for all content
+        # If debug mode is enabled, add raw field information at the beginning
+        if debug:
+            console.print("[bold yellow]Debug Information:[/bold yellow]")
+            
+            # Show fields that are most important for debugging - improved logging
+            debug_fields = ["issuetype", "assignee", "reporter", "status", "priority"]
+            for key in debug_fields:
+                if key in fields:
+                    value = fields[key]
+                    console.print(f"[dim yellow]- {key}:[/dim yellow] {value}")
+                else:
+                    console.print(f"[dim red]- {key}: Not found in response[/dim red]")
         
-        # ===== SECTION: SUMMARY =====
+        # Get the summary for the title
         summary = fields.get("summary", "No summary provided")
-        issue_table.add_row(f"[bold cyan]SUMMARY[/bold cyan]\n{summary}")
+        
+        # Create a single table with HEAVY borders for improved visibility
+        # Use a single column layout with a title that includes the issue key and summary
+        issue_table = Table(
+            box=box.DOUBLE_EDGE, 
+            show_header=False, 
+            expand=True, 
+            padding=1,
+            title=f"[bold cyan]{issue_key}:[/bold cyan] {summary}",
+            title_justify="center",
+            title_style="bold white"
+        )
+        issue_table.add_column("Content", style="green")  # Single column for all content
         
         # ===== SECTION: DETAILS =====
         # Extract status
@@ -66,15 +86,40 @@ def issue(issue_key, json, debug):
             if status_category:
                 status = f"{status} ({status_category})"
         
-        # Extract issue type - More detailed extraction
+        # Extract issue type - Significantly improved extraction with better fallbacks
         issue_type = "Unknown"
         if "issuetype" in fields:
             issuetype_data = fields["issuetype"]
             if debug:
-                console.print(f"[dim]Debug - Issue type data: {issuetype_data}[/dim]")
+                console.print(f"[dim yellow]Debug - Issue type data:[/dim yellow] {issuetype_data}")
                 
             if isinstance(issuetype_data, dict):
-                issue_type = issuetype_data.get("name", "Unknown")
+                # Try all possible field names for the name of the issue type
+                issue_type = (issuetype_data.get("name") or 
+                             issuetype_data.get("value") or 
+                             issuetype_data.get("displayName") or 
+                             issuetype_data.get("display_name") or 
+                             "Unknown")
+            elif isinstance(issuetype_data, str):
+                issue_type = issuetype_data
+        
+        # Additional check for alternative field names
+        if issue_type == "Unknown" and "issueType" in fields:  # Try camel case variant
+            issuetype_data = fields["issueType"]
+            if isinstance(issuetype_data, dict):
+                issue_type = (issuetype_data.get("name") or 
+                             issuetype_data.get("value") or 
+                             "Unknown")
+            elif isinstance(issuetype_data, str):
+                issue_type = issuetype_data
+        
+        # If all else fails, check for issue_type (snake case)
+        if issue_type == "Unknown" and "issue_type" in fields:
+            issuetype_data = fields["issue_type"]
+            if isinstance(issuetype_data, dict):
+                issue_type = (issuetype_data.get("name") or 
+                             issuetype_data.get("value") or 
+                             "Unknown")
             elif isinstance(issuetype_data, str):
                 issue_type = issuetype_data
         
@@ -87,11 +132,11 @@ def issue(issue_key, json, debug):
         assignee = "Unassigned"
         if "assignee" in fields:
             assignee_data = fields["assignee"]
-            if debug:
-                console.print(f"[dim]Debug - Assignee data: {assignee_data}[/dim]")
-                
             if isinstance(assignee_data, dict):
-                assignee = assignee_data.get("displayName", assignee_data.get("name", "Unknown"))
+                # Check for both camel case and snake case field names
+                assignee = (assignee_data.get("displayName") or 
+                           assignee_data.get("display_name") or 
+                           assignee_data.get("name", "Unknown"))
             elif isinstance(assignee_data, str):
                 assignee = assignee_data
             elif assignee_data is None:
@@ -101,11 +146,11 @@ def issue(issue_key, json, debug):
         reporter = "Unknown"
         if "reporter" in fields:
             reporter_data = fields["reporter"]
-            if debug:
-                console.print(f"[dim]Debug - Reporter data: {reporter_data}[/dim]")
-                
             if isinstance(reporter_data, dict):
-                reporter = reporter_data.get("displayName", reporter_data.get("name", "Unknown"))
+                # Check for both camel case and snake case field names
+                reporter = (reporter_data.get("displayName") or 
+                           reporter_data.get("display_name") or 
+                           reporter_data.get("name", "Unknown"))
             elif isinstance(reporter_data, str):
                 reporter = reporter_data
         
@@ -137,27 +182,20 @@ def issue(issue_key, json, debug):
             else:
                 updated_str = str(updated_date)
         
-        # If debug mode is enabled, add raw field information
+        # If debug is enabled, print what values we're actually using
         if debug:
-            console.print("[dim]Debug - Fields in issue data:[/dim]")
-            for key in fields:
-                if key in ["assignee", "reporter", "issuetype", "status", "priority"]:
-                    value = fields[key]
-                    if isinstance(value, dict):
-                        console.print(f"[dim]  {key}: {value}[/dim]")
-                    else:
-                        console.print(f"[dim]  {key}: {value}[/dim]")
+            console.print("[dim yellow]Using the following values:[/dim yellow]")
+            console.print(f"[dim yellow]- Status:[/dim yellow] {status}")
+            console.print(f"[dim yellow]- Type:[/dim yellow] {issue_type} (from field: {'issuetype' if 'issuetype' in fields else 'issueType' if 'issueType' in fields else 'issue_type' if 'issue_type' in fields else 'Not found'})")
+            console.print(f"[dim yellow]- Priority:[/dim yellow] {priority}")
+            console.print(f"[dim yellow]- Assignee:[/dim yellow] {assignee}")
+            console.print(f"[dim yellow]- Reporter:[/dim yellow] {reporter}")
         
-        # Format all details as a single block of text
-        details = f"""[bold cyan]DETAILS[/bold cyan]
-[bold]Status:[/bold] {status}
-[bold]Type:[/bold] {issue_type}
-[bold]Priority:[/bold] {priority}
-[bold]Assignee:[/bold] {assignee}
-[bold]Reporter:[/bold] {reporter}
-[bold]Created:[/bold] {created_str}
-[bold]Updated:[/bold] {updated_str}
-"""
+        # Format all details as a single line with key-value pairs
+        #details = "[bold cyan]DETAILS[/bold cyan]\n"
+        details = f"[bold]Status:[/bold] {status} | [bold]Type:[/bold] {issue_type} | [bold]Priority:[/bold] {priority} | "
+        details += f"[bold]Assignee:[/bold] {assignee} | [bold]Reporter:[/bold] {reporter} | "
+        details += f"[bold]Created:[/bold] {created_str} | [bold]Updated:[/bold] {updated_str}"
         
         # Add details as a row
         issue_table.add_row(details)
@@ -175,48 +213,53 @@ def issue(issue_key, json, debug):
                 if "content" in description:
                     # Debug all content if requested
                     if debug:
-                        console.print(f"[dim]Description structure:[/dim]")
+                        console.print("[dim yellow]Description structure preview:[/dim yellow]")
                         try:
                             import json as json_lib
-                            console.print(f"[dim]{json_lib.dumps(description, indent=2)[:200]}...[/dim]")
+                            desc_preview = json_lib.dumps(description, indent=2)
+                            # Only show first few lines to avoid overwhelming output
+                            preview_lines = desc_preview.split("\n")[:10]
+                            if len(preview_lines) < len(desc_preview.split("\n")):
+                                preview_lines.append("  ... (truncated)")
+                            console.print("\n".join(preview_lines))
                         except Exception:
                             console.print("[dim]Could not serialize description[/dim]")
                     
                     # Extract text from Atlassian Document Format
                     desc_text = _extract_text_from_adf(description)
                     
-                    if debug:
-                        console.print(f"[dim]Debug - Extracted text length: {len(desc_text)}[/dim]")
-                        if desc_text:
-                            console.print(f"[dim]First 50 chars: '{desc_text[:50]}...'[/dim]")
+                    if debug and desc_text:
+                        console.print(f"[dim yellow]Extracted description length:[/dim yellow] {len(desc_text)} characters")
+                        console.print(f"[dim yellow]Preview:[/dim yellow] '{desc_text[:100]}...'")
                 elif "text" in description:
                     desc_text = description["text"]
-            
-            # Debug print the description object structure
-            if debug and isinstance(description, dict):
-                console.print(f"[dim]Description object type: {type(description)}[/dim]")
-                console.print(f"[dim]Description keys: {list(description.keys())}[/dim]")
         
-        # Add the description with a header
+        # Add the description header as a separate row
+        issue_table.add_row("[bold cyan]DESCRIPTION[/bold cyan]")
+        
+        # Add the description content (if any)
         if desc_text and desc_text.strip():
             from rich.panel import Panel
             from rich.text import Text
             
-            # First add the section header
-            issue_table.add_row("[bold cyan]DESCRIPTION[/bold cyan]")
-            
-            # Then add the panel as a separate row with the content
+            # Create a panel with the description text
             wrapped_text = Text(desc_text)
             panel = Panel(wrapped_text, border_style="dim", expand=False)
+            
+            # Add the panel as a separate row
             issue_table.add_row(panel)
         else:
-            issue_table.add_row("[bold cyan]DESCRIPTION[/bold cyan]\n[italic]No description provided[/italic]")
+            issue_table.add_row("[italic]No description provided[/italic]")
         
         # Print the table
         console.print(issue_table)
         
     except Exception as e:
         console.print(f"[bold red]Error:[/bold red] {str(e)}")
+        if debug:
+            import traceback
+            console.print("[bold red]Traceback:[/bold red]")
+            console.print(traceback.format_exc())
         # Don't propagate the exception during testing
         if os.environ.get("TASKRA_TESTING") != "1":
             raise
@@ -255,7 +298,7 @@ def _extract_text_from_adf(doc):
         elif node_type in ["bulletList", "orderedList"]:
             # Just join list items
             return "".join(result)
-        elif node_type == "hardBreak":
+        elif node_type in ["hardBreak"]:
             # Hard break gets converted to newline
             return "\n"
         else:
