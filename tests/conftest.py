@@ -1,70 +1,17 @@
-"""Common test fixtures for Taskra tests."""
+"""Test configuration and fixtures."""
 
 import pytest
-import tempfile
-from unittest.mock import Mock
+import logging
 
-from taskra.config.manager import ConfigManager
-from taskra.api.client import JiraClient
+# Import timeout mechanism to ensure it's loaded for all tests
+from tests.models.test_debug_timeout import apply_timeout_to_all_tests
 
+# Log the fact that timeout protection is enabled
+logging.info("Test timeout protection enabled")
 
-@pytest.fixture
-def temp_config_dir():
-    """Create a temporary directory for test configurations."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        yield temp_dir
-
-
-@pytest.fixture
-def test_config_manager(temp_config_dir):
-    """Create a ConfigManager instance using a temporary directory."""
-    return ConfigManager(config_dir=temp_config_dir)
-
-
-@pytest.fixture
-def mock_jira_client():
-    """Create a mock JiraClient for testing."""
-    mock_client = Mock(spec=JiraClient)
-    mock_client.get.return_value = {}
-    mock_client.post.return_value = {}
-    mock_client.put.return_value = {}
-    mock_client.delete.return_value = {}
-    return mock_client
-
-
-@pytest.fixture
-def sample_worklog_data():
-    """Return sample worklog data for testing."""
-    return [
-        {
-            "id": "12345",
-            "timeSpent": "1h",
-            "timeSpentSeconds": 3600,
-            "author": {
-                "displayName": "Test User",
-                "accountId": "test-user-id"
-            },
-            "created": "2023-01-01T10:00:00.000+0000",
-            "started": "2023-01-01T09:00:00.000+0000",
-            "comment": {
-                "type": "doc",
-                "version": 1,
-                "content": [
-                    {
-                        "type": "paragraph",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": "Test comment"
-                            }
-                        ]
-                    }
-                ]
-            },
-            "issue": {
-                "id": "10001",
-                "key": "TEST-123",
-                "self": "https://example.atlassian.net/rest/api/3/issue/10001"
-            }
-        }
-    ]
+# This is a test runner hook that marks all tests with the timeout marker
+def pytest_collection_modifyitems(items):
+    """Add timeout marker to all tests."""
+    for item in items:
+        if not item.get_closest_marker("timeout"):
+            item.add_marker(pytest.mark.timeout(seconds=30))

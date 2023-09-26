@@ -1,62 +1,91 @@
 """Models for Jira worklogs."""
 
-from typing import Dict, List, Optional, Any
-from datetime import datetime
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from typing import Dict, List, Optional, Any, Union
+from datetime import datetime, timedelta
+from pydantic import Field, field_validator, model_validator
+
+from .base import BaseJiraModel, BaseJiraListModel, ApiResource, TimestampedResource
+from .user import User  # Import the User model
 
 
-class Author(BaseModel):
-    """Worklog author model."""
+class Author(BaseJiraModel):
+    """
+    Represents the author of a worklog entry.
     
+    This is a simplified version of User model specific to worklog context.
+    """
     account_id: str = Field(..., alias="accountId")
     display_name: str = Field(..., alias="displayName")
+    email_address: Optional[str] = Field(None, alias="emailAddress")
+    active: Optional[bool] = None
+    time_zone: Optional[str] = Field(None, alias="timeZone")
+    # Add proper support for avatarUrls field
+    avatar_urls: Optional[Dict[str, str]] = Field(None, alias="avatarUrls")
     
-    model_config = ConfigDict(populate_by_name=True)
+    @classmethod
+    def from_user(cls, user: User) -> "Author":
+        """Create an author from a User model."""
+        return cls(
+            accountId=user.account_id,
+            displayName=user.display_name,
+            emailAddress=user.email_address,
+            active=user.active,
+            timeZone=user.time_zone
+        )
 
 
-class Visibility(BaseModel):
-    """Worklog visibility model."""
+class Visibility(BaseJiraModel):
+    """
+    Worklog visibility model.
     
-    type: str
-    value: str
+    Controls who can see this worklog entry.
+    """
+    type: str = Field(..., description="Type of visibility (group, role, etc.)")
+    value: str = Field(..., description="Value for the visibility type")
 
 
-class Worklog(BaseModel):
-    """Detailed worklog model."""
+class Worklog(TimestampedResource):
+    """
+    Detailed worklog model.
     
-    id: str
-    self: str
-    author: Author
-    time_spent: str = Field(..., alias="timeSpent")
-    time_spent_seconds: int = Field(..., alias="timeSpentSeconds")
-    started: datetime
-    created: datetime
-    updated: datetime
-    comment: Optional[Dict[str, Any]] = None
-    issue_id: Optional[str] = Field(None, alias="issueId")
-    visibility: Optional[Visibility] = None
+    Represents a time tracking entry for an issue.
     
-    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    API Endpoint: GET /rest/api/3/issue/{issueIdOrKey}/worklog/{id}
+    """
+    id: str = Field(..., description="Worklog ID")
+    author: Author = Field(..., description="User who created the worklog")
+    time_spent: str = Field(..., description="Human-readable time spent (e.g., '3h 30m')")
+    time_spent_seconds: int = Field(..., description="Time spent in seconds")
+    started: datetime = Field(..., description="When the work was started")
+    comment: Optional[Dict[str, Any]] = Field(None, description="Comment on the worklog")
+    issue_id: Optional[str] = Field(None, description="ID of the associated issue")
+    visibility: Optional[Visibility] = Field(None, description="Worklog visibility settings")
+    
+    # Additional fields for internal use (not from API)
+    issue_key: Optional[str] = Field(None, exclude=True, description="Key of the associated issue")
+    issue_summary: Optional[str] = Field(None, exclude=True, description="Summary of the associated issue")
 
-
-class WorklogCreate(BaseModel):
-    """Model for creating a new worklog."""
-    
-    time_spent_seconds: int = Field(..., alias="timeSpentSeconds")
-    started: Optional[datetime] = None  # If not provided, current time will be used
-    comment: Optional[str] = None
-    
-    model_config = ConfigDict(populate_by_name=True)
-    
     @field_validator("time_spent_seconds")
-    def validate_time_spent(cls, v):
-        """Validate time spent is positive."""
+    @classmethod
+    def validate_time_spent(cls, v: int) -> int:
+        """Validate that time spent is positive."""
         if v <= 0:
             raise ValueError("Time spent must be positive")
         return v
+
+
+class WorklogCreate(BaseJiraModel):
+    """
+    Model for creating a new worklog entry.
+    
+    API Endpoint: POST /rest/api/3/issue/{issueIdOrKey}/worklog
+    """
+    time_spent_seconds: int = Field(..., ge=1, description="Time spent in seconds")
+    comment: Optional[str] = Field(None, description="Comment on the worklog")
+    started: Optional[datetime] = Field(None, description="When the work was started")
     
     @classmethod
-    def from_simple(cls, time_spent: str, comment: Optional[str] = None, started: Optional[datetime] = None):
+    def from_simple(cls, time_spent: str, comment: Optional[str] = None, started: Optional[datetime] = None) -> "WorklogCreate":
         """
         Create a WorklogCreate instance from a simple time format.
         
@@ -106,12 +135,10 @@ class WorklogCreate(BaseModel):
         return total_seconds
 
 
-class WorklogList(BaseModel):
-    """List of worklogs with pagination info."""
+class WorklogList(BaseJiraListModel):
+    """
+    List of worklogs with pagination info.
     
-    start_at: int = Field(..., alias="startAt")
-    max_results: int = Field(..., alias="maxResults")
-    total: int
-    worklogs: List[Worklog]
-    
-    model_config = ConfigDict(populate_by_name=True)
+    API Endpoint: GET /rest/api/3/issue/{issueIdOrKey}/worklog
+    """
+    worklogs: List[Worklog] = Field(..., description="List of worklog entries")

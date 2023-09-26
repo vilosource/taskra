@@ -2,173 +2,124 @@
 
 from typing import Dict, List, Optional, Any, Union
 from datetime import datetime
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from pydantic import Field, field_validator
 
+from .base import BaseJiraModel, ApiResource, TimestampedResource
+from .user import User
 
-class IssueType(BaseModel):
-    """Issue type model."""
+class IssueType(BaseJiraModel):
+    """Represents a Jira issue type."""
     
-    id: str
-    name: Optional[str] = None
-    description: Optional[str] = None
-    icon_url: Optional[str] = Field(None, alias="iconUrl")
+    id: str = Field(..., description="Issue type ID")
+    name: str = Field(..., description="Issue type name (e.g., 'Bug', 'Task')")
+    description: Optional[str] = Field(None, description="Issue type description")
+    icon_url: Optional[str] = Field(None, alias="iconUrl", description="URL to the issue type icon")
+    subtask: bool = Field(False, description="Whether this is a subtask type")
+
+class IssueStatus(BaseJiraModel):
+    """Represents a Jira issue status."""
     
-    model_config = ConfigDict(populate_by_name=True)
+    id: str = Field(default="1", description="Status ID") # Default value added
+    name: str = Field(default="To Do", description="Status name (e.g., 'To Do', 'In Progress')")
+    description: Optional[str] = Field(None, description="Status description")
+    status_category: Optional[Dict[str, Any]] = Field(None, alias="statusCategory")
 
-
-class StatusCategory(BaseModel):
-    """Status category model."""
+class IssueFields(BaseJiraModel):
+    """Fields of a Jira issue."""
     
-    id: int
-    key: str
-    name: str
-    color_name: Optional[str] = Field(None, alias="colorName")
+    summary: str = Field(..., description="Issue summary")
+    description: Optional[Dict[str, Any]] = Field(None, description="Issue description in ADF format")
+    issue_type: IssueType = Field(..., alias="issuetype", description="Issue type")
+    status: IssueStatus = Field(default_factory=IssueStatus, description="Current issue status") # Default factory added
+    assignee: Optional[User] = Field(None, description="User assigned to the issue")
+    reporter: Optional[User] = Field(None, description="User who reported the issue")
+    created: datetime = Field(default_factory=datetime.now, description="When the issue was created") # Default factory added
+    updated: datetime = Field(default_factory=datetime.now, description="When the issue was last updated") # Default factory added
+    # Add other fields as needed
 
-
-class Status(BaseModel):
-    """Issue status model."""
+class Issue(ApiResource):
+    """
+    Represents a Jira issue.
     
-    id: str
-    name: str
-    description: Optional[str] = None
-    status_category: Optional[StatusCategory] = Field(None, alias="statusCategory")
+    API Endpoint: /rest/api/3/issue/{issueIdOrKey}
+    """
     
-    model_config = ConfigDict(populate_by_name=True)
+    id: str = Field(..., description="Issue ID")
+    key: str = Field(..., description="Issue key (e.g., 'PROJECT-123')")
+    fields: IssueFields = Field(..., description="Issue fields")
 
-
-class User(BaseModel):
-    """Basic user information."""
+class IssueSummary(BaseJiraModel):
+    """
+    Summary representation of a Jira issue.
     
-    account_id: str = Field(..., alias="accountId")
-    display_name: str = Field(..., alias="displayName")
-    email_address: Optional[str] = Field(None, alias="emailAddress")
-    active: Optional[bool] = None
+    Used for lightweight listings and references.
+    """
     
-    model_config = ConfigDict(populate_by_name=True)
-
-
-class DocNode(BaseModel):
-    """Document node for Atlassian Document Format."""
-    
-    type: str
-    content: Optional[List[Any]] = None
-    text: Optional[str] = None
-    
-    model_config = ConfigDict(extra="allow")
-
-
-class Document(BaseModel):
-    """Atlassian Document Format model."""
-    
-    type: str = "doc"
-    version: int = 1
-    content: List[DocNode]
-
-
-class TextContent(BaseModel):
-    """Text content for simple descriptions."""
-    
-    text: str
-
-
-class IssueSummary(BaseModel):
-    """Basic issue information."""
-    
-    id: str
-    key: str
-    self: str
-
-
-class IssueFields(BaseModel):
-    """Issue fields model."""
-    
-    summary: str
-    description: Optional[Union[Document, TextContent, Dict[str, Any]]] = None
-    status: Optional[Status] = None
-    assignee: Optional[User] = None
-    reporter: Optional[User] = None
-    created: Optional[datetime] = None
-    updated: Optional[datetime] = None
-    issue_type: Optional[IssueType] = Field(None, alias="issuetype")
-    priority: Optional[Dict[str, Any]] = None
-    
-    model_config = ConfigDict(populate_by_name=True, extra="allow")  # Allow extra fields returned by the API
-
-
-class Issue(IssueSummary):
-    """Detailed issue model."""
-    
-    fields: IssueFields
-    
-    model_config = ConfigDict(populate_by_name=True)
-
-
-class ProjectRef(BaseModel):
-    """Project reference for creating issues."""
-    
-    key: str
-
-
-class IssueTypeRef(BaseModel):
-    """Issue type reference for creating issues."""
-    
-    id: str
-
-
-class DescriptionContent(BaseModel):
-    """Content for description when creating an issue."""
-    
-    type: str = "paragraph"
-    content: List[Dict[str, str]]
-
-
-class DescriptionDoc(BaseModel):
-    """Description document for creating an issue."""
-    
-    type: str = "doc"
-    version: int = 1
-    content: List[DescriptionContent]
-
-
-class IssueCreateFields(BaseModel):
-    """Fields for creating a new issue."""
-    
-    project: ProjectRef
-    summary: str
-    issuetype: IssueTypeRef
-    description: Optional[DescriptionDoc] = None
-    
-    model_config = ConfigDict(populate_by_name=True)
-
-
-class IssueCreate(BaseModel):
-    """Model for creating a new issue."""
-    
-    fields: IssueCreateFields
+    id: str = Field(..., description="Issue ID")
+    key: str = Field(..., description="Issue key (e.g., 'PROJECT-123')")
+    summary: str = Field(..., description="Issue summary")
+    issue_type: Optional[str] = Field(None, alias="issueType", description="Type of issue")
+    status: Optional[str] = Field(None, description="Issue status")
+    assignee: Optional[str] = Field(None, description="Assigned user's display name")
     
     @classmethod
-    def from_simple(cls, project_key: str, summary: str, description: str, issue_type_id: str = "10001"):
-        """
-        Create an IssueCreate instance from simple parameters.
-        
-        Args:
-            project_key: The project key
-            summary: Issue summary
-            description: Plain text description
-            issue_type_id: The issue type ID (default is "10001" for Task)
-            
-        Returns:
-            IssueCreate instance
-        """
-        content = [DescriptionContent(
-            content=[{"type": "text", "text": description}]
-        )]
-        
+    def from_issue(cls, issue: Issue) -> "IssueSummary":
+        """Create a summary from a full Issue model."""
         return cls(
-            fields=IssueCreateFields(
-                project=ProjectRef(key=project_key),
-                summary=summary,
-                issuetype=IssueTypeRef(id=issue_type_id),
-                description=DescriptionDoc(content=content) if description else None
-            )
+            id=issue.id,
+            key=issue.key,
+            summary=issue.fields.summary,
+            issueType=issue.fields.issue_type.name if issue.fields.issue_type else None,
+            status=issue.fields.status.name if issue.fields.status else None,
+            assignee=issue.fields.assignee.display_name if issue.fields.assignee else None
         )
+
+class IssueCreate(BaseJiraModel):
+    """
+    Model for creating a new issue.
+    
+    API Endpoint: POST /rest/api/3/issue
+    """
+    project_key: str = Field(..., description="Key of the project to create issue in")
+    summary: str = Field(..., description="Issue summary")
+    description: Optional[str] = Field(None, description="Issue description")
+    issue_type: str = Field(..., description="Issue type name (e.g., 'Bug', 'Task')")
+    assignee: Optional[str] = Field(None, description="Account ID of user to assign")
+    
+    def to_api_payload(self) -> Dict[str, Any]:
+        """
+        Convert to API-compatible payload format.
+        
+        Returns:
+            Dictionary in the format expected by the Jira API
+        """
+        payload = {
+            "fields": {
+                "project": {"key": self.project_key},
+                "summary": self.summary,
+                "issuetype": {"name": self.issue_type}
+            }
+        }
+        
+        if self.description:
+            # Convert to Atlassian Document Format if it's a simple string
+            payload["fields"]["description"] = {
+                "type": "doc",
+                "version": 1,
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": self.description
+                            }
+                        ]
+                    }
+                ]
+            }
+            
+        if self.assignee:
+            payload["fields"]["assignee"] = {"accountId": self.assignee}
+            
+        return payload

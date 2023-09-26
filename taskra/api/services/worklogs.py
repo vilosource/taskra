@@ -1,11 +1,15 @@
 """Worklog service for interacting with Jira worklogs API."""
 
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Union, cast
 from datetime import datetime, timedelta
 import logging
 
+from ..models.worklog import (
+    Worklog, WorklogCreate, WorklogList, Author, Visibility
+)
+from ..models.user import User
+from ...utils.serialization import deserialize_model, to_serializable
 from .base import BaseService
-from ..models.worklog import WorklogCreate, WorklogList
 
 
 class WorklogService(BaseService):
@@ -13,87 +17,91 @@ class WorklogService(BaseService):
     
     def add_worklog(self, issue_key: str, time_spent: str, 
                     comment: Optional[str] = None,
-                    started: Optional[datetime] = None) -> Dict[str, Any]:
+                    started: Optional[datetime] = None) -> Worklog:
         """
-        Add a worklog to an issue.
+        Add a worklog entry to an issue.
         
         Args:
-            issue_key: The issue key (e.g., PROJECT-123)
-            time_spent: Time spent in format like "2h 30m" or "3h"
+            issue_key: The issue key (e.g., 'PROJECT-123')
+            time_spent: Time spent in format like '2h 30m'
             comment: Optional comment for the worklog
-            started: Optional start time (defaults to now)
+            started: Optional datetime when work started (defaults to now)
             
         Returns:
-            Created worklog data dictionary
+            Worklog model instance
         """
-        worklog_data = WorklogCreate.from_simple(
+        # Create worklog model
+        worklog_create = WorklogCreate.from_simple(
             time_spent=time_spent,
             comment=comment,
             started=started
         )
         
-        response = self.client.post(
-            self._get_endpoint(f"issue/{issue_key}/worklog"),
-            json_data=worklog_data.model_dump(by_alias=True)
-        )
+        # Convert to API format
+        payload = worklog_create.model_dump_api()
         
-        return response
+        # Send request
+        endpoint = self._get_endpoint(f"issue/{issue_key}/worklog")
+        response = self.client.post(endpoint, json=payload)
+        
+        # Parse response to Worklog model
+        return Worklog.from_api(response)
     
     def list_worklogs(self, issue_key: str, start_at: int = 0, 
-                      max_results: int = 50, get_all: bool = True) -> List[Dict[str, Any]]:
+                      max_results: int = 50, get_all: bool = True) -> List[Worklog]:
         """
-        Get worklogs for an issue with pagination support.
+        Get worklogs for an issue.
         
         Args:
-            issue_key: The issue key (e.g., PROJECT-123)
-            start_at: Index of the first worklog to return (for pagination)
+            issue_key: The issue key (e.g., 'PROJECT-123')
+            start_at: Index of first worklog to return
             max_results: Maximum number of worklogs to return per request
-            get_all: If True, retrieve all worklogs by handling pagination automatically
+            get_all: Whether to fetch all worklogs (multiple requests if needed)
             
         Returns:
-            List of worklog data dictionaries
+            List of Worklog model instances
         """
         if get_all:
-            return self._get_all_worklogs(issue_key, max_results_per_page=max_results)
+            return self._get_all_worklogs(issue_key)
         
-        params = {
-            "startAt": start_at,
-            "maxResults": max_results
-        }
+        # Make API request
+        endpoint = self._get_endpoint(f"issue/{issue_key}/worklog")
+        params = {"startAt": start_at, "maxResults": max_results}
+        response = self.client.get(endpoint, params=params)
         
-        response = self.client.get(self._get_endpoint(f"issue/{issue_key}/worklog"), params=params)
-        worklog_list = WorklogList.model_validate(response)
+        # Convert to WorklogList model
+        worklog_list = WorklogList.from_api(response)
         
         return worklog_list.worklogs
     
-    def _get_all_worklogs(self, issue_key: str, max_results_per_page: int = 50) -> List[Dict[str, Any]]:
+    def _get_all_worklogs(self, issue_key: str, max_results_per_page: int = 50) -> List[Worklog]:
         """
         Get all worklogs for an issue by handling pagination.
         
         Args:
             issue_key: The issue key
-            max_results_per_page: Maximum number of worklogs to return per request
+            max_results_per_page: Max results per API request
             
         Returns:
-            Complete list of worklog data dictionaries
+            Complete list of all Worklog model instances
         """
         all_worklogs = []
         start_at = 0
         total = None
         
         while total is None or start_at < total:
-            params = {
-                "startAt": start_at,
-                "maxResults": max_results_per_page
-            }
+            # Make API request
+            endpoint = self._get_endpoint(f"issue/{issue_key}/worklog")
+            params = {"startAt": start_at, "maxResults": max_results_per_page}
+            response = self.client.get(endpoint, params=params)
             
-            response = self.client.get(self._get_endpoint(f"issue/{issue_key}/worklog"), params=params)
-            worklog_list = WorklogList.model_validate(response)
+            # Convert to WorklogList model
+            worklog_list = WorklogList.from_api(response)
             worklogs = worklog_list.worklogs
             
+            # Add worklogs to result list
             all_worklogs.extend(worklogs)
             
-            # If this is the first request, get the total count
             if total is None:
                 total = worklog_list.total
             
@@ -109,7 +117,7 @@ class WorklogService(BaseService):
     def get_user_worklogs(self, username: Optional[str] = None, 
                           start_date: Optional[str] = None, 
                           end_date: Optional[str] = None,
-                          debug_level: str = 'none') -> List[Dict[str, Any]]:
+                          debug_level: str = 'none') -> List[Worklog]:
         """
         Get worklogs for a specific user.
         
@@ -120,11 +128,19 @@ class WorklogService(BaseService):
             debug_level: Debug output level ('none', 'error', 'info', 'verbose')
             
         Returns:
-            List of worklog data dictionaries
+            List of Worklog model instances
         """
+        # Ensure debug_level is valid to prevent hanging
+        if debug_level not in ['none', 'error', 'info', 'verbose']:
+            logging.warning(f"Invalid debug_level: {debug_level}, defaulting to 'none'")
+            debug_level = 'none'
+            
         # Set up logging based on debug level
         show_debug = debug_level == 'verbose'
         show_info = debug_level in ('info', 'verbose')
+        
+        if show_info:
+            logging.info("Starting get_user_worklogs in WorklogService")
         
         # Set default dates if not provided
         if not start_date:
@@ -141,7 +157,6 @@ class WorklogService(BaseService):
         formatted_end = f"'{end_date}'"
         
         # Use JQL to search for worklogs within the date range
-        # Use worklogDate >= '2023-04-01' format for dates
         jql = f"worklogDate >= {formatted_start} AND worklogDate <= {formatted_end}"
         
         # Add username constraint if provided - ensure email addresses are properly quoted
@@ -151,7 +166,7 @@ class WorklogService(BaseService):
             jql += f" AND worklogAuthor = {quoted_username}"
         
         if show_info:
-            logging.info(f"Searching with JQL: {jql}")
+            logging.info(f"Using JQL: {jql}")
         
         # Search for issues with matching worklogs
         params = {
@@ -165,7 +180,15 @@ class WorklogService(BaseService):
             if show_debug:
                 print(f"DEBUG: Executing JQL query: {jql}")
             
+            if show_info:
+                logging.info("Sending API request to search for issues")
+            
             response = self.client.get(self._get_endpoint("search"), params=params)
+            
+            if show_info:
+                logging.info("API request completed successfully")
+                if "issues" in response:
+                    logging.info(f"Found {len(response.get('issues', []))} issues with worklogs")
             
             if "issues" not in response:
                 if show_info:
@@ -176,9 +199,19 @@ class WorklogService(BaseService):
                 logging.info(f"Found {len(response.get('issues', []))} issues with worklogs")
                 
             # Collect all worklogs from the returned issues
-            all_worklogs = []
+            all_worklogs: List[Worklog] = []
+            
+            # Add a debug timeout to prevent hanging
+            max_issues = 100  # Prevent processing too many issues
+            processed_issues = 0
             
             for issue in response.get("issues", []):
+                # Safety check to prevent infinite processing
+                processed_issues += 1
+                if processed_issues > max_issues:
+                    logging.warning(f"Reached maximum number of issues to process: {max_issues}")
+                    break
+                
                 issue_key = issue.get("key", "")
                 issue_summary = issue.get("fields", {}).get("summary", "")
                 
@@ -190,31 +223,34 @@ class WorklogService(BaseService):
                     worklogs_response = self.client.get(
                         self._get_endpoint(f"issue/{issue_key}/worklog")
                     )
-                    issue_worklogs = worklogs_response.get("worklogs", [])
+                    
+                    # Convert to WorklogList model
+                    worklog_list = WorklogList.from_api(worklogs_response)
+                    issue_worklogs = worklog_list.worklogs
                     
                     if show_debug:
                         print(f"DEBUG: Found {len(issue_worklogs)} worklogs for issue {issue_key}")
                     
                     # Filter by date range and username if specified
                     for worklog in issue_worklogs:
-                        # Add issue information to each worklog
-                        worklog["issueKey"] = issue_key
-                        worklog["issueSummary"] = issue_summary
+                        # Add issue information to each worklog (using the non-API fields)
+                        worklog.issue_key = issue_key
+                        worklog.issue_summary = issue_summary
                         
                         # Apply date filter
-                        if "started" in worklog:
-                            worklog_date = worklog["started"].split("T")[0]
+                        if hasattr(worklog, 'started'):
+                            worklog_date = worklog.started.strftime("%Y-%m-%d")
                             if worklog_date >= start_date and worklog_date <= end_date:
                                 # Apply username filter if specified
                                 if username:
-                                    author_name = worklog.get("author", {}).get("displayName", "")
-                                    author_email = worklog.get("author", {}).get("emailAddress", "")
-                                    author_id = worklog.get("author", {}).get("accountId", "")
+                                    author_name = worklog.author.display_name.lower()
+                                    author_email = getattr(worklog.author, 'email_address', '') or ''
+                                    author_id = worklog.author.account_id
                                     
                                     # Check if any author field contains our username
                                     username_lower = username.lower()
-                                    if (username_lower in author_name.lower() or 
-                                        username_lower in (author_email or "").lower() or
+                                    if (username_lower in author_name or 
+                                        username_lower in author_email.lower() or
                                         username_lower == author_id):
                                         all_worklogs.append(worklog)
                                         if show_debug:
@@ -222,7 +258,7 @@ class WorklogService(BaseService):
                                 else:
                                     all_worklogs.append(worklog)
                                     if show_debug:
-                                        author_name = worklog.get("author", {}).get("displayName", "")
+                                        author_name = worklog.author.display_name
                                         print(f"DEBUG: Added worklog by {author_name} for {issue_key}")
                             
                 except Exception as e:

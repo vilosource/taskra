@@ -1,15 +1,14 @@
-"""Projects service for interacting with Jira projects API."""
+"""Project service for interacting with Jira projects API."""
 
-from typing import Dict, List, Any, Optional
-
+from typing import Dict, List, Any, Optional, Union
+from ..models.project import Project, ProjectList, ProjectSummary
+from ...utils.serialization import to_serializable
 from .base import BaseService
-from ..models.project import Project, ProjectList
-
 
 class ProjectsService(BaseService):
     """Service for interacting with Jira projects API."""
     
-    def list_projects(self, start_at: int = 0, max_results: int = 50) -> List[Dict[str, Any]]:
+    def list_projects(self, start_at: int = 0, max_results: int = 50) -> List[Project]:
         """
         Get a list of projects visible to the user.
         
@@ -18,7 +17,7 @@ class ProjectsService(BaseService):
             max_results: Maximum number of projects to return
             
         Returns:
-            List of project data dictionaries
+            List of Project models
         """
         params = {
             "startAt": start_at,
@@ -27,10 +26,9 @@ class ProjectsService(BaseService):
         
         response = self.client.get(self._get_endpoint("project/search"), params=params)
         project_list = ProjectList.model_validate(response)
-        
-        return [project.model_dump(by_alias=False) for project in project_list.values]
+        return project_list.values
     
-    def list_all_projects(self, max_results_per_page: int = 50) -> List[Dict[str, Any]]:
+    def list_all_projects(self, max_results_per_page: int = 50) -> List[Project]:
         """
         Get all projects visible to the user, handling pagination.
         
@@ -38,7 +36,7 @@ class ProjectsService(BaseService):
             max_results_per_page: Maximum number of projects to return per request
             
         Returns:
-            Complete list of project data dictionaries
+            Complete list of Project models
         """
         all_projects = []
         start_at = 0
@@ -53,32 +51,23 @@ class ProjectsService(BaseService):
             response = self.client.get(self._get_endpoint("project/search"), params=params)
             project_list = ProjectList.model_validate(response)
             
-            # Add projects from this page to our result
-            all_projects.extend([project.model_dump(by_alias=False) for project in project_list.values])
-            
-            # Check if this is the last page
+            all_projects.extend(project_list.values)
             is_last_page = project_list.is_last
             
-            # Update start_at for next page
-            start_at += len(project_list.values)
-            
-            # Safety check - if we got fewer results than requested, we're done
-            if len(project_list.values) < max_results_per_page:
-                break
+            if not is_last_page:
+                start_at += len(project_list.values)
         
         return all_projects
     
-    def get_project(self, project_key: str) -> Dict[str, Any]:
+    def get_project(self, project_key: str) -> Project:
         """
-        Get detailed information about a specific project.
+        Get a project by key.
         
         Args:
-            project_key: The project key
+            project_key: Project key (e.g., 'PROJECT')
             
         Returns:
-            Project data dictionary
+            Project model
         """
         response = self.client.get(self._get_endpoint(f"project/{project_key}"))
-        project = Project.model_validate(response)
-        
-        return project.model_dump(by_alias=False)
+        return Project.model_validate(response)

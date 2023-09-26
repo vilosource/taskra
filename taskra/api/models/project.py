@@ -1,78 +1,75 @@
 """Models for Jira projects."""
 
 from typing import Dict, List, Optional, Any
-from datetime import datetime
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import Field
 
+from .base import BaseJiraModel, ApiResource
 
-class ProjectCategory(BaseModel):
+class ProjectCategory(BaseJiraModel):
     """Project category model."""
     
-    id: str
-    name: str
-    description: Optional[str] = None
+    id: str = Field(..., description="Category ID")
+    name: str = Field(..., description="Category name")
+    description: Optional[str] = Field(None, description="Category description")
 
-
-class AvatarUrls(BaseModel):
-    """Avatar URLs model with different sizes."""
-    
-    x16: str = Field(..., alias="16x16")
-    x24: str = Field(..., alias="24x24")
-    x32: str = Field(..., alias="32x32")
-    x48: str = Field(..., alias="48x48")
-
-
-class ProjectLead(BaseModel):
-    """Project lead user information."""
+class ProjectLead(BaseJiraModel):
+    """Project lead model."""
     
     account_id: str = Field(..., alias="accountId")
     display_name: str = Field(..., alias="displayName")
-    email: Optional[str] = None
-    active: Optional[bool] = None
-
-
-class ProjectInsight(BaseModel):
-    """Project insight information."""
     
-    total_issue_count: int = Field(..., alias="totalIssueCount")
-    last_issue_update_time: Optional[datetime] = Field(None, alias="lastIssueUpdateTime")
-
-
-class ProjectSummary(BaseModel):
-    """Basic project information."""
+class Project(ApiResource):
+    """
+    Project model representing a Jira project.
     
-    id: str
-    key: str
-    name: str
-    project_type_key: str = Field(..., alias="projectTypeKey")
-    avatar_urls: Optional[AvatarUrls] = Field(None, alias="avatarUrls")
-    insight: Optional[ProjectInsight] = None
-
-
-class Project(ProjectSummary):
-    """Detailed project model."""
+    API Endpoint: /rest/api/3/project/{projectIdOrKey}
+    """
     
-    description: Optional[str] = None
-    lead: Optional[ProjectLead] = None
-    url: Optional[str] = None
-    project_category: Optional[ProjectCategory] = Field(None, alias="projectCategory")
-    simplified: Optional[bool] = None
-    style: Optional[str] = None
-    is_private: Optional[bool] = Field(None, alias="isPrivate")
-    
-    model_config = ConfigDict(
-        populate_by_name=True,
-        extra="ignore"  # Allow extra attributes that might be returned by the API
-    )
+    self_url: str = Field(..., alias="self", description="URL to this resource")
+    id: str = Field(..., description="Project ID")
+    key: str = Field(..., description="Project key")
+    name: str = Field(..., description="Project name")
+    description: Optional[str] = Field(None, description="Project description")
+    lead: Optional[ProjectLead] = Field(None, description="Project lead")
+    category: Optional[ProjectCategory] = Field(None, description="Project category")
+    project_type_key: Optional[str] = Field(None, alias="projectTypeKey", description="Project type")
+    simplified: Optional[bool] = Field(None, description="Whether this is a simplified project")
+    style: Optional[str] = Field(None, description="Project style")
+    is_private: Optional[bool] = Field(None, alias="isPrivate", description="Whether project is private")
 
-
-class ProjectList(BaseModel):
-    """List of projects with pagination info."""
+class ProjectSummary(BaseJiraModel):
+    """
+    Lightweight summary of a project, used for listings and references.
     
-    start_at: int = Field(..., alias="startAt")
-    max_results: int = Field(..., alias="maxResults")
-    total: int
-    is_last: bool = Field(..., alias="isLast")
-    values: List[ProjectSummary]
+    Contains only essential project information.
+    """
     
-    model_config = ConfigDict(populate_by_name=True)
+    id: str = Field(..., description="Project ID")
+    key: str = Field(..., description="Project key") 
+    name: str = Field(..., description="Project name")
+    project_type_key: Optional[str] = Field(None, alias="projectTypeKey", description="Project type key")
+    
+    @classmethod
+    def from_project(cls, project: Project) -> "ProjectSummary":
+        """Create a summary from a full Project model."""
+        return cls(
+            id=project.id,
+            key=project.key,
+            name=project.name,
+            projectTypeKey=project.project_type_key
+        )
+    
+class ProjectList(BaseJiraModel):
+    """List of projects from the Jira API response."""
+    
+    # Update fields to match the Jira API search endpoint response structure
+    start_at: int = Field(..., alias="startAt", description="Index of the first item")
+    max_results: int = Field(..., alias="maxResults", description="Maximum results per page")
+    total: int = Field(..., description="Total number of projects available")
+    is_last: bool = Field(..., alias="isLast", description="Whether this is the last page")
+    values: List[Project] = Field(..., description="List of projects")
+    
+    @property
+    def projects(self) -> List[Project]:
+        """Property for backward compatibility."""
+        return self.values

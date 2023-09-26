@@ -1,101 +1,97 @@
-# Makefile for running Taskra tests
+# Taskra Makefile - Development and testing utilities
 
-.PHONY: tests test-unit test-integration test-config test-api test-core test-cmd test-account test-worklogs clean
+.PHONY: clean test test-all test-core test-models test-integration lint examples setup
 
-# Default Python command
-PYTHON := python
+# Default Python interpreter
+PYTHON = python
 # Default pytest command with common options
-PYTEST := pytest -v
+PYTEST = pytest -v
+# Default coverage command
+COVERAGE = coverage
 
-# Global target to run all tests
-tests: test-unit test-integration
+# Project directories
+SRC_DIR = taskra
+TEST_DIR = tests
+DOC_DIR = docs
+CACHE_DIR = ~/.taskra/cache
 
-# Run all unit tests
-test-unit:
-	$(PYTEST) tests/unit/
+# Test targets
+test: test-all
 
-# Run all integration tests
-test-integration:
-	$(PYTEST) tests/integration/
+# Run all tests
+test-all:
+	$(PYTEST) $(TEST_DIR)
 
-# Run configuration tests
-test-config:
-	$(PYTEST) tests/unit/config/
-
-# Run API related tests
-test-api:
-	$(PYTEST) tests/unit/api/
-
-# Run API services tests
-test-api-services:
-	$(PYTEST) tests/unit/api/services/
-
-# Run API models tests
-test-api-models:
-	$(PYTEST) tests/unit/api/models/
-
-# Run core functionality tests
+# Run only core tests
 test-core:
-	$(PYTEST) tests/unit/core/
+	$(PYTEST) $(TEST_DIR)/core
 
-# Run worklog tests
-test-worklogs:
-	$(PYTEST) tests/core/test_worklogs.py
+# Run only model tests (new)
+test-models:
+	$(PYTEST) $(TEST_DIR)/models
 
-# Run command line tests
-test-cmd:
-	$(PYTEST) tests/unit/cmd/
+# Run only integration tests
+test-integration:
+	$(PYTEST) $(TEST_DIR)/integration
 
-# Run account management tests
-test-account:
-	$(PYTEST) tests/unit/config/test_account.py
+# Run example scripts
+examples:
+	$(PYTHON) -m tests.examples.worklog_model_example
 
-# Run config manager tests
-test-config-manager:
-	$(PYTEST) tests/unit/config/test_manager.py
+# Run tests with coverage
+coverage:
+	$(COVERAGE) run -m pytest $(TEST_DIR)
+	$(COVERAGE) report -m
+	$(COVERAGE) html
 
-# Run API client tests
-test-api-client:
-	$(PYTEST) tests/unit/api/test_client.py
+# Lint the code
+lint:
+	flake8 $(SRC_DIR) $(TEST_DIR)
+	mypy $(SRC_DIR)
 
-# Run with coverage report
-test-coverage:
-	$(PYTEST) --cov=taskra --cov-report=term --cov-report=html tests/
+# Setup development environment
+setup:
+	pip install -e .
+	pip install -r requirements-dev.txt
 
-# Run tests in parallel (useful for large test suites)
-test-parallel:
-	$(PYTEST) -xvs -n auto tests/
-
-# Generate HTML test report
-test-report:
-	$(PYTEST) --html=report.html tests/
-
-# Clean up cache and temporary files
+# Clean cache and temporary files
 clean:
 	rm -rf .pytest_cache
-	rm -rf htmlcov
-	rm -rf .coverage
-	rm -f report.html
-	find . -type d -name __pycache__ -exec rm -rf {} +
+	rm -rf .coverage htmlcov
+	rm -rf __pycache__ $(SRC_DIR)/__pycache__ $(TEST_DIR)/__pycache__
+	rm -rf $(CACHE_DIR)
+	find . -type d -name "__pycache__" -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
 
-# Help target
+# Watch and run tests on file changes (requires watchdog)
+watch:
+	watchmedo shell-command \
+		--patterns="*.py" \
+		--recursive \
+		--command='make test-models' \
+		$(SRC_DIR) $(TEST_DIR)/models
+
+# Documentation
+doc:
+	cd $(DOC_DIR) && mkdocs build
+
+# Serve documentation
+doc-serve:
+	cd $(DOC_DIR) && mkdocs serve
+
+# Help command
 help:
 	@echo "Available targets:"
-	@echo "  tests            : Run all tests"
-	@echo "  test-unit        : Run unit tests"
-	@echo "  test-integration : Run integration tests"
-	@echo "  test-config      : Run configuration tests"
-	@echo "  test-api         : Run API tests"
-	@echo "  test-api-services: Run API services tests"
-	@echo "  test-api-models  : Run API models tests"
-	@echo "  test-core        : Run core functionality tests"
-	@echo "  test-worklogs    : Run worklog tests"
-	@echo "  test-cmd         : Run command line tests"
-	@echo "  test-account     : Run account management tests"
-	@echo "  test-config-manager: Run config manager tests"
-	@echo "  test-api-client  : Run API client tests"
-	@echo "  test-coverage    : Run tests with coverage report"
-	@echo "  test-parallel    : Run tests in parallel"
-	@echo "  test-report      : Generate HTML test report"
-	@echo "  clean            : Clean up temporary files"
+	@echo "  test        - Run all tests"
+	@echo "  test-all    - Run all tests (same as test)"
+	@echo "  test-core   - Run only core tests"
+	@echo "  test-models - Run only model tests"
+	@echo "  test-integration - Run only integration tests" 
+	@echo "  examples    - Run example scripts"
+	@echo "  coverage    - Run tests with coverage report"
+	@echo "  lint        - Check code style and quality"
+	@echo "  setup       - Set up development environment"
+	@echo "  clean       - Remove temporary files"
+	@echo "  watch       - Watch for file changes and run tests"
+	@echo "  doc         - Build documentation"
+	@echo "  doc-serve   - Serve documentation locally"

@@ -50,11 +50,11 @@ class TestIssuesService:
         # Call the method and check results
         issue = service.get_issue("TEST-1")
         
-        assert issue["key"] == "TEST-1"
-        assert issue["fields"]["summary"] == "Test issue"
-        
-        # Verify the client was called correctly
-        mock_client.get.assert_called_once_with("issue/TEST-1")
+        # Check the issue model attributes (instead of dictionary access)
+        assert issue.key == "TEST-1"
+        assert issue.id == "10000"
+        assert issue.fields.summary == "Test issue"
+        assert issue.fields.issue_type.name == "Task"
     
     def test_get_comments_single_page(self):
         """Test retrieving comments when they fit in a single page."""

@@ -1,22 +1,51 @@
 """Issue management functionality."""
 
-from ..api.services.issues import IssuesService
-from ..api.client import get_client
+import logging
+from typing import Dict, List, Any, Optional, cast
 
-def get_issue(issue_key):
+from ..api.services.issues import IssuesService
+from ..api.models.issue import Issue, IssueCreate
+from ..api.client import get_client
+from ..utils.cache import generate_cache_key, get_from_cache, save_to_cache
+from ..utils.serialization import to_serializable
+
+# Define a type alias for backward compatibility
+IssueDict = Dict[str, Any]
+
+def get_issue(issue_key: str, refresh_cache: bool = False) -> IssueDict:
     """
-    Get information about a specific issue.
+    Get an issue by key.
     
     Args:
-        issue_key: The JIRA issue key (e.g., PROJECT-123)
+        issue_key: The issue key (e.g., PROJECT-123)
+        refresh_cache: If True, bypass the cache and get fresh data
         
     Returns:
-        dict: Issue data
+        Dictionary representation of the issue (for backward compatibility)
     """
-    # Get the client and use the IssuesService
-    client = get_client()  # This would get a configured client
-    issues_service = IssuesService(client)
-    return issues_service.get_issue(issue_key)
+    # Generate cache key
+    cache_key = generate_cache_key(function="get_issue", issue_key=issue_key)
+    
+    # Try to get from cache unless refresh is requested
+    if not refresh_cache:
+        cached_data = get_from_cache(cache_key)
+        if cached_data is not None:
+            logging.info(f"Using cached issue data for {issue_key}")
+            return cached_data
+    
+    # If we got here, we need to fetch fresh data
+    logging.info(f"Fetching fresh issue data for {issue_key}")
+    client = get_client()
+    issue_service = IssuesService(client)
+    
+    # Get the issue model from the service
+    issue_model = issue_service.get_issue(issue_key)
+    
+    # Convert to serializable format for caching and backward compatibility
+    serializable_issue = to_serializable(issue_model)
+    save_to_cache(cache_key, serializable_issue)
+    
+    return serializable_issue
 
 def create_issue(project_key, summary, description, issue_type="Task"):
     """
