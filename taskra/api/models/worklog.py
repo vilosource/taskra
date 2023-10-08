@@ -58,12 +58,46 @@ class Worklog(TimestampedResource):
     time_spent_seconds: int = Field(..., description="Time spent in seconds")
     started: datetime = Field(..., description="When the work was started")
     comment: Optional[Dict[str, Any]] = Field(None, description="Comment on the worklog")
-    issue_id: Optional[str] = Field(None, description="ID of the associated issue")
+    issue_id: Optional[str] = Field(None, alias="issueKey", description="ID of the associated issue")
     visibility: Optional[Visibility] = Field(None, description="Worklog visibility settings")
     
     # Additional fields for internal use (not from API)
     issue_key: Optional[str] = Field(None, exclude=True, description="Key of the associated issue")
     issue_summary: Optional[str] = Field(None, exclude=True, description="Summary of the associated issue")
+
+    @property
+    def issueKey(self) -> Optional[str]:
+        """
+        Get the issue key, prioritizing the explicit issue_key field if set.
+        This provides backward compatibility for code expecting the issueKey field.
+        """
+        if self.issue_key:
+            return self.issue_key
+        return self.issue_id
+    
+    @issueKey.setter
+    def issueKey(self, value: str) -> None:
+        """
+        Set the issue key.
+        This provides backward compatibility for code setting the issueKey field.
+        """
+        self.issue_key = value
+        
+    @property
+    def issueSummary(self) -> Optional[str]:
+        """
+        Get the issue summary.
+        This provides backward compatibility for code expecting the issueSummary field.
+        """
+        return self.issue_summary
+    
+    @issueSummary.setter
+    def issueSummary(self, value: str) -> None:
+        """
+        Set the issue summary.
+        This provides backward compatibility for code setting the issueSummary field.
+        """
+        self.issue_summary = value
 
     @field_validator("time_spent_seconds")
     @classmethod

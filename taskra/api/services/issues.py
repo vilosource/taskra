@@ -45,6 +45,18 @@ class IssuesService(BaseService):  # Renamed from IssueService to IssuesService
         Returns:
             IssueSearchResults object containing the search results
         """
+        # Safety check - don't send empty JQL
+        if not jql:
+            if debug:
+                print("[DEBUG] Empty JQL query, using default ordering")
+            jql = "order by created DESC"
+        
+        # Make sure project and status values are properly quoted
+        jql = self._ensure_proper_jql_quoting(jql)
+        
+        if debug:
+            print(f"[DEBUG] Final JQL query: {jql}")
+            
         params = {
             "jql": jql,
             "startAt": start_at,
@@ -57,23 +69,61 @@ class IssuesService(BaseService):  # Renamed from IssueService to IssuesService
         # Add any additional parameters
         params.update({k: v for k, v in kwargs.items() if v is not None})
         
-        response = self.client.get("/rest/api/3/search", params=params)
+        if debug:
+            print(f"[DEBUG] Search parameters: {params}")
         
-        # Check if response is already a dict (meaning the client might have already parsed it)
-        if isinstance(response, dict):
-            response_data = response
-        else:
-            response_data = response.json()
-        
-        # Debug the structure of the first issue if requested
-        if debug and "issues" in response_data and response_data["issues"]:
-            from ...utils.debug import dump_model_structure
-            print("\nDEBUG: First issue structure:")
-            first_issue = response_data["issues"][0]
-            dump_model_structure(first_issue)
+        try:
+            response = self.client.get("/rest/api/3/search", params=params)
+            
+            # Check if response is already a dict (meaning the client might have already parsed it)
+            if isinstance(response, dict):
+                response_data = response
+            else:
+                response_data = response.json()
+            
+            # Debug the structure of the first issue if requested
+            if debug and "issues" in response_data and response_data["issues"]:
+                from ...utils.debug import dump_model_structure
+                print("\nDEBUG: First issue structure:")
+                first_issue = response_data["issues"][0]
+                dump_model_structure(first_issue)
 
-        # Create model instance
-        return IssueSearchResults.model_validate(response_data)
+            # Create model instance
+            return IssueSearchResults.model_validate(response_data)
+        except Exception as e:
+            if debug:
+                print(f"[DEBUG] Error searching issues: {str(e)}")
+                if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                    print(f"[DEBUG] Response content: {e.response.text}")
+            # Re-raise the exception to be handled by the caller
+            raise
+    
+    def _ensure_proper_jql_quoting(self, jql: str) -> str:
+        """
+        Ensure JQL values are properly quoted.
+        
+        Args:
+            jql: Original JQL query string
+            
+        Returns:
+            Properly quoted JQL query
+        """
+        # This is a simple implementation. For production use,
+        # a more robust JQL parser would be preferred.
+        
+        # Look for project = X without quotes and add them
+        import re
+        jql = re.sub(r'project\s*=\s*([^"\s]+)', r'project = "\1"', jql)
+        
+        # Handle status in (...) without quotes
+        def quote_status_values(match):
+            values = match.group(1).split(',')
+            quoted_values = [f'"{v.strip()}"' if not v.strip().startswith('"') else v.strip() for v in values]
+            return f'status in ({", ".join(quoted_values)})'
+        
+        jql = re.sub(r'status\s+in\s*\(([^)]+)\)', quote_status_values, jql)
+        
+        return jql
         
     def get_comments(self, issue_key: str, start_at: int = 0, 
                     max_results: int = 50, get_all: bool = True) -> List[Dict[str, Any]]:

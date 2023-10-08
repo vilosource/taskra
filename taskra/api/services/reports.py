@@ -27,15 +27,43 @@ class ReportService(BaseService):
         """
         jql_parts = []
         
-        # Add project filter
+        # Add project filter with proper quoting
         if 'project_key' in filters and filters['project_key']:
-            jql_parts.append(f"project = {filters['project_key']}")
+            jql_parts.append(f'project = "{filters["project_key"]}"')
         
-        # Add additional filters as per your implementation
-        # ...
+        # Add date filters if provided
+        if 'start_date' in filters and filters['start_date']:
+            jql_parts.append(f'created >= "{filters["start_date"]}"')
+        
+        if 'end_date' in filters and filters['end_date']:
+            jql_parts.append(f'created <= "{filters["end_date"]}"')
+        
+        # Add status filter if provided
+        if 'status' in filters and filters['status']:
+            statuses = [f'"{status}"' for status in filters['status']]
+            jql_parts.append(f'status in ({", ".join(statuses)})')
+        
+        # Add assignee filter if provided
+        if 'assignee' in filters and filters['assignee']:
+            jql_parts.append(f'assignee = "{filters["assignee"]}"')
+        
+        # Add reporter filter if provided
+        if 'reporter' in filters and filters['reporter']:
+            jql_parts.append(f'reporter = "{filters["reporter"]}"')
         
         # Combine all JQL parts
-        jql = " AND ".join(jql_parts)
+        jql = " AND ".join(jql_parts) if jql_parts else ""
+        
+        # Add sorting
+        sort_field = filters.get('sort_by', 'created')
+        sort_order = filters.get('sort_order', 'desc')
+        if jql:
+            jql += f" ORDER BY {sort_field} {sort_order}"
+        else:
+            jql = f"ORDER BY {sort_field} {sort_order}"
+        
+        if debug:
+            print(f"[DEBUG] JQL query: {jql}")
         
         # Get required fields - passing this as a parameter now
         fields_to_retrieve = ["summary", "status", "assignee", "priority", "created", "updated"]

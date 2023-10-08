@@ -155,3 +155,12 @@ def enable_debug_mode():
     global config_manager
     config_manager.debug = True
     print("DEBUG: Enabled debug mode for global ConfigManager")
+
+def get_auth_details():
+    """Get authentication details from environment or config."""
+    import os
+    return {
+        'base_url': os.environ.get('JIRA_BASE_URL'),
+        'email': os.environ.get('JIRA_EMAIL'),
+        'token': os.environ.get('JIRA_API_TOKEN')
+    }

@@ -1,82 +1,84 @@
-"""Project management functionality."""
+"""Core projects module for interacting with Jira projects."""
 
 import logging
-from typing import Dict, List, Any, Optional, cast
+from typing import Dict, List, Any, Optional, Union
+from datetime import datetime, timedelta
 
+from ..api.client import get_jira_client  # Changed from get_client to get_jira_client
 from ..api.services.projects import ProjectsService
-from ..api.models.project import Project, ProjectSummary
-from ..api.client import get_client
-from ..utils.cache import generate_cache_key, get_from_cache, save_to_cache
-from ..utils.serialization import to_serializable
 
-# Define type alias for backward compatibility
-ProjectDict = Dict[str, Any]
+logger = logging.getLogger(__name__)
 
-def list_projects(refresh_cache: bool = False) -> List[ProjectDict]:
+def list_projects(max_results: int = 50) -> List[Dict[str, Any]]:
     """
-    Get a list of projects visible to the user.
+    List all accessible projects.
     
     Args:
-        refresh_cache: If True, bypass the cache and get fresh data
+        max_results: Maximum number of results to return
         
     Returns:
-        Dictionary representations of projects (for backward compatibility)
+        List of project dictionaries
     """
-    # Generate cache key
-    cache_key = generate_cache_key(function="list_projects")
+    client = get_jira_client()
+    service = ProjectsService(client)
     
-    # Try to get from cache unless refresh is requested
-    if not refresh_cache:
-        cached_data = get_from_cache(cache_key)
-        if cached_data is not None:
-            logging.info("Using cached project data")
-            return cached_data
+    # Get projects as models
+    projects = service.list_projects(max_results=max_results)
     
-    # If we got here, we need to fetch fresh data
-    logging.info("Fetching fresh project data")
-    client = get_client()
-    project_service = ProjectsService(client)
-    
-    # Get project models from the service
-    project_models = project_service.list_all_projects()
-    
-    # Convert to serializable format for caching and backward compatibility
-    serializable_projects = [to_serializable(project) for project in project_models]
-    save_to_cache(cache_key, serializable_projects)
-    
-    return serializable_projects
+    # Convert to dictionaries for backward compatibility
+    return [project.model_dump(by_alias=True) for project in projects]
 
-def get_project(project_key: str, refresh_cache: bool = False) -> ProjectDict:
+def get_project(project_key: str) -> Dict[str, Any]:
     """
     Get a project by key.
     
     Args:
-        project_key: The project key
-        refresh_cache: If True, bypass the cache and get fresh data
+        project_key: Project key (e.g., 'PROJ')
         
     Returns:
-        Dictionary representation of the project (for backward compatibility)
+        Project data as a dictionary
     """
-    # Generate cache key
-    cache_key = generate_cache_key(function="get_project", project_key=project_key)
+    client = get_jira_client()
+    service = ProjectsService(client)
     
-    # Try to get from cache unless refresh is requested
-    if not refresh_cache:
-        cached_data = get_from_cache(cache_key)
-        if cached_data is not None:
-            logging.info(f"Using cached project data for {project_key}")
-            return cached_data
+    # Get the project as a model
+    project = service.get_project(project_key)
     
-    # If we got here, we need to fetch fresh data
-    logging.info(f"Fetching fresh project data for {project_key}")
-    client = get_client()
-    project_service = ProjectsService(client)
+    # Convert to dictionary for backward compatibility
+    return project.model_dump(by_alias=True)
+
+def get_project_categories() -> List[Dict[str, Any]]:
+    """
+    Get all project categories.
     
-    # Get the project model from the service
-    project_model = project_service.get_project(project_key)
+    Returns:
+        List of project category dictionaries
+    """
+    client = get_jira_client()
+    service = ProjectsService(client)
     
-    # Convert to serializable format for caching and backward compatibility
-    serializable_project = to_serializable(project_model)
-    save_to_cache(cache_key, serializable_project)
+    # Get categories as models
+    categories = service.get_project_categories()
     
-    return serializable_project
+    # Convert to dictionaries for backward compatibility
+    return [category.model_dump(by_alias=True) for category in categories]
+
+def search_projects(query: str, max_results: int = 50) -> List[Dict[str, Any]]:
+    """
+    Search for projects by name.
+    
+    Args:
+        query: Search query string
+        max_results: Maximum number of results to return
+        
+    Returns:
+        List of project dictionaries matching the query
+    """
+    client = get_jira_client()
+    service = ProjectsService(client)
+    
+    # Search projects as models
+    projects = service.search_projects(query, max_results=max_results)
+    
+    # Convert to dictionaries for backward compatibility
+    return [project.model_dump(by_alias=True) for project in projects]

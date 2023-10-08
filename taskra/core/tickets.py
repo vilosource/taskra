@@ -6,6 +6,7 @@ retrieving tickets for a specific project and applying filters.
 """
 
 from typing import List, Dict, Any
+from ..api.client import get_jira_client  # Changed from get_client to get_jira_client
 from ..api.services.reports import ReportService
 
 def get_project_tickets(project_key: str, **kwargs) -> List[Dict[str, Any]]:
@@ -27,8 +28,11 @@ def get_project_tickets(project_key: str, **kwargs) -> List[Dict[str, Any]]:
         **kwargs
     }
     
+    # Get the Jira client
+    client = get_jira_client()
+    
     # Generate the report using the ReportService
-    report_service = ReportService()
+    report_service = ReportService(client)
     tickets = report_service.project_tickets_report(filters, debug=debug)
     
     return tickets

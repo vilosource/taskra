@@ -7,6 +7,7 @@ import requests
 from typing import Dict, Any, Optional, Union
 from urllib.parse import urljoin
 from requests.auth import HTTPBasicAuth
+from .auth import get_auth_details
 
 # Set up logger
 logger = logging.getLogger("jira_client")
@@ -180,16 +181,47 @@ def get_jira_client() -> JiraClient:
     
     Returns:
         JiraClient instance
+    
+    Raises:
+        ValueError: If no account is configured
     """
     global _jira_client
     
     if _jira_client is None:
-        # Load credentials from environment variables or configuration
-        base_url = os.environ.get("JIRA_BASE_URL", "https://optiscangroup.atlassian.net/rest/api/3")
-        email = os.environ.get("JIRA_EMAIL", "")
-        api_token = os.environ.get("JIRA_API_TOKEN", "")
-        
-        # Create client
-        _jira_client = JiraClient(base_url, email, api_token)
+        # Get authentication details from auth module
+        try:
+            auth_details = get_auth_details()
+            
+            # Get auth details, falling back to environment variables
+            base_url = auth_details.get('base_url')
+            email = auth_details.get('email')
+            api_token = auth_details.get('token')
+            
+            # Validate we have the required credentials
+            if not base_url or not email or not api_token:
+                raise ValueError("Missing required authentication details")
+            
+            # Create client
+            _jira_client = JiraClient(base_url, email, api_token)
+            
+        except Exception as e:
+            # Re-raise any exceptions from get_auth_details
+            raise ValueError(f"No Jira account configured: {str(e)}")
         
     return _jira_client
+
+# Alias for backward compatibility
+def get_client() -> JiraClient:
+    """
+    Alias for get_jira_client() for backward compatibility.
+    
+    Returns:
+        JiraClient instance
+    """
+    import warnings
+    warnings.warn(
+        "get_client() is deprecated, use get_jira_client() instead",
+        DeprecationWarning,
+        stacklevel=2
+    )
+    return get_jira_client()

@@ -3,6 +3,7 @@
 from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
 import logging
+import json
 
 from ..api.client import get_jira_client
 from ..api.services.reports import ReportService
@@ -32,11 +33,22 @@ def generate_project_tickets_report(
         print("[DEBUG] Maximum results:", max_results)
         print("[DEBUG] Using date filters:", filters.get("start_date_explicit", False))
     
-    # Call the report service to generate the report
-    result = report_service.project_tickets_report(filters, max_results=max_results, debug=debug)
-    
-    # Return the properly formatted result
-    return result
+    try:
+        # Call the report service to generate the report
+        result = report_service.project_tickets_report(filters, max_results=max_results, debug=debug)
+        
+        # Return the properly formatted result
+        return result
+    except Exception as e:
+        if debug:
+            print(f"[DEBUG] Error generating project tickets report: {str(e)}")
+            if hasattr(e, 'response') and hasattr(e.response, 'content'):
+                try:
+                    error_json = e.response.json()
+                    print(f"[DEBUG] API error details: {json.dumps(error_json, indent=2)}")
+                except Exception:
+                    print(f"[DEBUG] Raw response: {e.response.content.decode('utf-8', errors='replace')}")
+        raise
 
 
 def generate_cross_project_report(project_keys: List[str], filters: Dict[str, Any] = None, debug: bool = False) -> Dict[str, Any]:

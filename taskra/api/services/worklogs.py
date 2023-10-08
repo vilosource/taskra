@@ -204,8 +204,9 @@ class WorklogService(BaseService):
             # Add a debug timeout to prevent hanging
             max_issues = 100  # Prevent processing too many issues
             processed_issues = 0
+            total_issues = len(response.get("issues", []))
             
-            for issue in response.get("issues", []):
+            for i, issue in enumerate(response.get("issues", [])):
                 # Safety check to prevent infinite processing
                 processed_issues += 1
                 if processed_issues > max_issues:
@@ -215,11 +216,17 @@ class WorklogService(BaseService):
                 issue_key = issue.get("key", "")
                 issue_summary = issue.get("fields", {}).get("summary", "")
                 
+                if show_info:
+                    logging.info(f"Processing issue {i+1}/{total_issues}: {issue_key}")
+                
                 if show_debug:
                     print(f"DEBUG: Processing issue {issue_key}: {issue_summary}")
                 
                 # Get detailed worklogs for this issue
                 try:
+                    if show_info:
+                        logging.info(f"Fetching worklogs for issue {issue_key}")
+                        
                     worklogs_response = self.client.get(
                         self._get_endpoint(f"issue/{issue_key}/worklog")
                     )
@@ -227,6 +234,9 @@ class WorklogService(BaseService):
                     # Convert to WorklogList model
                     worklog_list = WorklogList.from_api(worklogs_response)
                     issue_worklogs = worklog_list.worklogs
+                    
+                    if show_info:
+                        logging.info(f"Found {len(issue_worklogs)} worklogs for issue {issue_key}")
                     
                     if show_debug:
                         print(f"DEBUG: Found {len(issue_worklogs)} worklogs for issue {issue_key}")
@@ -236,6 +246,10 @@ class WorklogService(BaseService):
                         # Add issue information to each worklog (using the non-API fields)
                         worklog.issue_key = issue_key
                         worklog.issue_summary = issue_summary
+                        
+                        # Also add these as camelCase versions for compatibility with different consumers
+                        setattr(worklog, "issueKey", issue_key)
+                        setattr(worklog, "issueSummary", issue_summary)
                         
                         # Apply date filter
                         if hasattr(worklog, 'started'):

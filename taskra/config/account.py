@@ -102,13 +102,13 @@ def get_current_account() -> Optional[Dict[str, Any]]:
 def validate_credentials(url: str, email: str, token: str, debug: bool = False) -> bool:
     """
     Validate account credentials by making a test API call.
-    
+
     Args:
         url: Jira instance URL
         email: User email
         token: API token
         debug: Enable debug logging
-        
+
     Returns:
         True if credentials are valid, False otherwise
     """
@@ -116,20 +116,22 @@ def validate_credentials(url: str, email: str, token: str, debug: bool = False) 
         # Import here to avoid circular imports
         from ..api.client import JiraClient
         from ..api.services.users import UserService
-        
+
         if debug:
             print(f"DEBUG: Creating JiraClient for validation with URL: {url}")
-            
+
+        # Pass email and token as separate arguments
         temp_client = JiraClient(
             base_url=url,
-            auth={"email": email, "token": token},
+            email=email,
+            api_token=token,
             debug=debug
         )
         user_service = UserService(temp_client)
-        
+
         if debug:
             print("DEBUG: Calling validate_credentials on UserService")
-            
+
         return user_service.validate_credentials()
     except Exception as e:
         if debug:

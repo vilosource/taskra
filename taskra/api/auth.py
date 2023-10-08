@@ -1,87 +1,50 @@
-"""Authentication handlers for Jira API."""
+"""Authentication utilities for Jira API."""
 
 import os
 from typing import Dict, Any, Optional
 
-
-class AuthProvider:
+def get_auth_details() -> Dict[str, Any]:
     """
-    Base class for authentication providers.
+    Get authentication details from environment variables or configuration.
     
-    This follows the Strategy pattern, allowing different ways to obtain authentication.
+    First checks environment variables, then falls back to configuration file.
+    
+    Returns:
+        Dictionary containing base_url, email, and token
     """
+    # First try environment variables
+    env_base_url = os.environ.get('JIRA_BASE_URL')
+    env_email = os.environ.get('JIRA_EMAIL')
+    env_token = os.environ.get('JIRA_API_TOKEN')
     
-    def get_auth(self) -> Dict[str, Any]:
-        """
-        Get authentication details.
-        
-        Returns:
-            Dictionary containing auth details
-        """
-        raise NotImplementedError("Subclasses must implement get_auth()")
-
-
-class EnvironmentAuthProvider(AuthProvider):
-    """Authentication provider that uses environment variables."""
+    # If all environment variables are set, use them
+    if env_base_url and env_email and env_token:
+        return {
+            'base_url': env_base_url,
+            'email': env_email,
+            'token': env_token
+        }
     
-    def get_auth(self) -> Optional[Dict[str, Any]]:
-        """Get authentication details from environment variables."""
-        base_url = os.environ.get('JIRA_BASE_URL')
-        email = os.environ.get('JIRA_EMAIL')
-        token = os.environ.get('JIRA_API_TOKEN')
-        
-        if base_url and email and token:
-            return {
-                'base_url': base_url,
-                'email': email,
-                'token': token
-            }
-        return None
-
-
-class ConfigAuthProvider(AuthProvider):
-    """Authentication provider that uses configuration files."""
-    
-    def get_auth(self) -> Optional[Dict[str, Any]]:
-        """Get authentication details from configuration."""
-        # To avoid circular imports, import here
+    # Otherwise, fall back to the configuration file
+    try:
         from ..config.account import get_current_account
         
         account = get_current_account()
         if account:
             return {
-                'base_url': account['url'],
-                'email': account['email'],
-                'token': account['token']
+                'base_url': account.get('url'),
+                'email': account.get('email'),
+                'token': account.get('token')
             }
-        return None
-
-
-def get_auth_details() -> Dict[str, Any]:
-    """
-    Get authentication details from available providers.
+    except ImportError:
+        pass
+    except Exception as e:
+        import logging
+        logging.debug(f"Error getting account from config: {str(e)}")
     
-    Returns:
-        Dictionary with authentication details
-        
-    Raises:
-        ValueError: If no authentication details are found
-    """
-    # Try environment variables first
-    env_provider = EnvironmentAuthProvider()
-    auth = env_provider.get_auth()
-    
-    # If not found, try configuration
-    if not auth:
-        config_provider = ConfigAuthProvider()
-        auth = config_provider.get_auth()
-    
-    # If still not found, raise an error
-    if not auth:
-        raise ValueError(
-            "No Jira account configured. Either set JIRA_BASE_URL, JIRA_EMAIL, and "
-            "JIRA_API_TOKEN environment variables, or add an account with "
-            "'taskra config add'."
-        )
-    
-    return auth
+    # Return environment variables (which could be None) if no config is found
+    return {
+        'base_url': env_base_url,
+        'email': env_email,
+        'token': env_token
+    }

@@ -1,86 +1,107 @@
-"""Issue management functionality."""
+"""Core issues module for interacting with Jira issues."""
 
 import logging
-from typing import Dict, List, Any, Optional, cast
+from typing import Dict, List, Any, Optional, Union
+from datetime import datetime, timedelta
 
+from ..api.client import get_jira_client  # Changed from get_client to get_jira_client
 from ..api.services.issues import IssuesService
-from ..api.models.issue import Issue, IssueCreate
-from ..api.client import get_client
-from ..utils.cache import generate_cache_key, get_from_cache, save_to_cache
-from ..utils.serialization import to_serializable
+from ..api.models.issue import Issue, IssueCreate, IssueFields
 
-# Define a type alias for backward compatibility
-IssueDict = Dict[str, Any]
+logger = logging.getLogger(__name__)
 
-def get_issue(issue_key: str, refresh_cache: bool = False) -> IssueDict:
+def get_issue(issue_key: str) -> Dict[str, Any]:
     """
     Get an issue by key.
     
     Args:
-        issue_key: The issue key (e.g., PROJECT-123)
-        refresh_cache: If True, bypass the cache and get fresh data
+        issue_key: Issue key (e.g., 'PROJECT-123')
         
     Returns:
-        Dictionary representation of the issue (for backward compatibility)
+        Issue data as a dictionary
     """
-    # Generate cache key
-    cache_key = generate_cache_key(function="get_issue", issue_key=issue_key)
+    client = get_jira_client()
+    service = IssuesService(client)
     
-    # Try to get from cache unless refresh is requested
-    if not refresh_cache:
-        cached_data = get_from_cache(cache_key)
-        if cached_data is not None:
-            logging.info(f"Using cached issue data for {issue_key}")
-            return cached_data
+    # Get the issue as a model
+    issue_model = service.get_issue(issue_key)
     
-    # If we got here, we need to fetch fresh data
-    logging.info(f"Fetching fresh issue data for {issue_key}")
-    client = get_client()
-    issue_service = IssuesService(client)
-    
-    # Get the issue model from the service
-    issue_model = issue_service.get_issue(issue_key)
-    
-    # Convert to serializable format for caching and backward compatibility
-    serializable_issue = to_serializable(issue_model)
-    save_to_cache(cache_key, serializable_issue)
-    
-    return serializable_issue
+    # Convert to dictionary for backward compatibility
+    return issue_model.model_dump(by_alias=True)
 
-def create_issue(project_key, summary, description, issue_type="Task"):
+def create_issue(
+    project_key: str,
+    summary: str,
+    description: Optional[str] = None,
+    issue_type: str = "Task"
+) -> Dict[str, Any]:
     """
     Create a new issue.
     
     Args:
-        project_key: The key of the project
+        project_key: Project key
         summary: Issue summary
         description: Issue description
         issue_type: Type of issue (default: Task)
         
     Returns:
-        dict: Created issue data
+        Created issue data
     """
-    # Get the client and use the IssuesService
-    client = get_client()
-    issues_service = IssuesService(client)
-    return issues_service.create_issue(
+    client = get_jira_client()
+    service = IssuesService(client)
+    
+    # Create the issue
+    issue_model = service.create_issue(
         project_key=project_key,
         summary=summary,
         description=description,
         issue_type=issue_type
     )
+    
+    # Convert to dictionary for backward compatibility
+    return issue_model.model_dump(by_alias=True)
 
-def get_issue_comments(issue_key, get_all=True):
+def get_issue_comments(issue_key: str, get_all: bool = True) -> List[Dict[str, Any]]:
     """
-    Get comments for a specific issue.
+    Get comments for an issue.
     
     Args:
-        issue_key: The JIRA issue key (e.g., PROJECT-123)
-        get_all: If True, retrieve all comments
+        issue_key: Issue key (e.g., 'PROJECT-123')
+        get_all: Whether to fetch all comments or just the first page
         
     Returns:
-        list: Issue comments
+        List of comments
     """
-    client = get_client()
-    issues_service = IssuesService(client)
-    return issues_service.get_comments(issue_key, get_all=get_all)
+    client = get_jira_client()
+    service = IssuesService(client)
+    
+    return service.get_comments(issue_key, get_all=get_all)
+
+def search_issues(
+    jql: str,
+    max_results: int = 50,
+    fields: Optional[List[str]] = None
+) -> Dict[str, Any]:
+    """
+    Search for issues using JQL.
+    
+    Args:
+        jql: JQL query string
+        max_results: Maximum number of results to return
+        fields: List of field names to include
+        
+    Returns:
+        Search results
+    """
+    client = get_jira_client()
+    service = IssuesService(client)
+    
+    # Perform the search
+    results = service.search_issues(
+        jql=jql,
+        max_results=max_results,
+        fields=fields
+    )
+    
+    # Convert to dictionary for backward compatibility
+    return results.model_dump(by_alias=True)

@@ -27,8 +27,10 @@ class IssueStatus(BaseJiraModel):
 class IssueFields(BaseJiraModel):
     """Fields for an issue."""
     summary: Optional[str] = None
-    description: Optional[str] = None
+    # Handle description as either string or ADF object
+    description: Optional[Union[str, Dict[str, Any]]] = None
     status: Optional[IssueStatus] = None
+    issue_type: Optional[IssueType] = Field(None, alias="issuetype")
     assignee: Optional[User] = None
     priority: Optional[Dict[str, Any]] = None  # Priority can have a complex structure
     created: Optional[datetime] = None

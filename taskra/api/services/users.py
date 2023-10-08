@@ -8,6 +8,20 @@ from .base import BaseService
 class UserService(BaseService):
     """Service for interacting with Jira users API."""
     
+    def validate_credentials(self) -> bool:
+        """
+        Validate the current authentication credentials.
+        
+        Returns:
+            True if credentials are valid, False otherwise
+        """
+        try:
+            # Make a simple API call to verify credentials
+            self.client.get("/rest/api/3/myself")
+            return True
+        except Exception:
+            return False
+    
     def get_current_user(self) -> User:
         """
         Get the current authenticated user.
