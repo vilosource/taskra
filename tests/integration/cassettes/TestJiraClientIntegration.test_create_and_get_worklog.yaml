@@ -1,0 +1,79 @@
+interactions:
+- request:
+    body: '{"timeSpentSeconds": 3600, "started": null, "comment": "Integration test
+      worklog"}'
+    headers:
+      Accept:
+      - application/json
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '82'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.32.3
+    method: POST
+    uri: https://example.atlassian.net/rest/api/3/issue/TEST-1/worklog
+  response:
+    body:
+      string: '{"errorMessages":["Issue does not exist or you do not have permission
+        to see it."],"errors":{}}'
+    headers:
+      Atl-Request-Id:
+      - 6cd23391-dc39-4919-9372-48b403a94577
+      Atl-Traceid:
+      - 6cd23391dc394919937248b403a94577
+      Cache-Control:
+      - no-cache, no-store, no-transform
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json;charset=UTF-8
+      Date:
+      - Fri, 28 Mar 2025 06:13:36 GMT
+      Nel:
+      - '{"failure_fraction": 0.001, "include_subdomains": true, "max_age": 600, "report_to":
+        "endpoint-1"}'
+      Report-To:
+      - '{"endpoints": [{"url": "https://dz8aopenkvv6s.cloudfront.net"}], "group":
+        "endpoint-1", "include_subdomains": true, "max_age": 600}'
+      Server:
+      - AtlassianEdge
+      Server-Timing:
+      - atl-edge;dur=105,atl-edge-internal;dur=13,atl-edge-upstream;dur=93,atl-edge-pop;desc="aws-eu-central-1"
+      Set-Cookie:
+      - atlassian.xsrf.token=1a8ac638b09194b558ee480597a1a18d211e62c6_lout; Path=/;
+        SameSite=None; Secure
+      Strict-Transport-Security:
+      - max-age=63072000; includeSubDomains; preload
+      Timing-Allow-Origin:
+      - '*'
+      Transfer-Encoding:
+      - chunked
+      Via:
+      - 1.1 82636c8aa9a5ece412a0bc535c0ca124.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - nY1dAq44q__Di49I-Dr-1wx18Um8q_eJFlXSkW-31BtubsqZVMObRw==
+      X-Amz-Cf-Pop:
+      - HEL51-P1
+      X-Arequestid:
+      - a027ecd04a8a6a782ecb31da900735c2
+      X-Cache:
+      - Error from cloudfront
+      X-Content-Type-Options:
+      - nosniff
+      X-Seraph-Loginreason:
+      - AUTHENTICATED_FAILED
+      X-Trace-Id:
+      - 6cd23391dc394919937248b403a94577
+      X-Xss-Protection:
+      - 1; mode=block
+    status:
+      code: 404
+      message: Not Found
+version: 1

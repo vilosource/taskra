@@ -1,0 +1,1 @@
+#implements the command line for config managermanet
