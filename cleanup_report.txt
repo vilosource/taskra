@@ -1,0 +1,1063 @@
+# Dictionary Pattern Cleanup Report
+
+Found 201 potential dict patterns in 27 files
+
+## benchmarks/model_vs_dict.py
+
+Line 42: Found dict pattern: ['id']
+```
+_ = worklog["id"]
+```
+
+Line 43: Found dict pattern: ['timeSpent']
+```
+_ = worklog["timeSpent"]
+```
+
+Line 44: Found dict pattern: ['author', 'displayName']
+```
+_ = worklog["author"]["displayName"]
+```
+
+Line 91: Found dict pattern: ['median']
+```
+print(f"Dictionary: {dict_create_results['median']:.6f} seconds")
+```
+
+Line 92: Found dict pattern: ['median']
+```
+print(f"Model:      {model_create_results['median']:.6f} seconds")
+```
+
+Line 93: Found dict pattern: ['median', 'median']
+```
+print(f"Overhead:   {(model_create_results['median'] / dict_create_results['median'] - 1) * 100:.2f}%")
+```
+
+Line 96: Found dict pattern: ['median']
+```
+print(f"Dictionary: {dict_access_results['median']:.6f} seconds")
+```
+
+Line 97: Found dict pattern: ['median']
+```
+print(f"Model:      {model_access_results['median']:.6f} seconds")
+```
+
+Line 98: Found dict pattern: ['median', 'median']
+```
+print(f"Overhead:   {(model_access_results['median'] / dict_access_results['median'] - 1) * 100:.2f}%")
+```
+
+## benchmarks/model_vs_dict_enhanced.py
+
+Line 52: Found dict pattern: ['median']
+```
+print(f"  Median: {result['median']:.6f} seconds")
+```
+
+Line 68: Found dict pattern: ['median']
+```
+base = self.results[base_name]['median']
+```
+
+Line 69: Found dict pattern: ['median']
+```
+compare = self.results[compare_name]['median']
+```
+
+Line 93: Found dict pattern: ['median']
+```
+print(f"  Median: {result['median']:.6f} seconds")
+```
+
+Line 94: Found dict pattern: ['mean']
+```
+print(f"  Mean: {result['mean']:.6f} seconds")
+```
+
+Line 95: Found dict pattern: ['min']
+```
+print(f"  Min: {result['min']:.6f} seconds")
+```
+
+Line 96: Found dict pattern: ['max']
+```
+print(f"  Max: {result['max']:.6f} seconds")
+```
+
+Line 194: Found dict pattern: ['key']
+```
+return obj["key"]
+```
+
+Line 202: Found dict pattern: ['author', 'displayName']
+```
+return obj["author"]["displayName"]
+```
+
+Line 222: Found dict pattern: ['author']
+```
+if "author" in result and isinstance(result["author"], dict):
+```
+
+Line 223: Found dict pattern: ['author', 'author']
+```
+result["author"] = dict(result["author"])
+```
+
+Line 237: Found dict pattern: ['id']
+```
+elif not isinstance(data["id"], str):
+```
+
+Line 242: Found dict pattern: ['timeSpentSeconds']
+```
+elif not isinstance(data["timeSpentSeconds"], int):
+```
+
+Line 244: Found dict pattern: ['timeSpentSeconds']
+```
+elif data["timeSpentSeconds"] <= 0:
+```
+
+Line 249: Found dict pattern: ['author']
+```
+elif not isinstance(data["author"], dict):
+```
+
+Line 251: Found dict pattern: ['author']
+```
+elif "displayName" not in data["author"]:
+```
+
+## scripts/cleanup.py
+
+Line 21: Found dict pattern: ['field']
+```
+r'\.get\([\'"](\w+)[\'"]\)',  # dict.get("field")
+```
+
+Line 22: Found dict pattern: ['field']
+```
+r'\[[\'"](\w+)[\'"]\]',  # dict["field"]
+```
+
+Line 23: Found dict pattern: ['dict']
+```
+r'for \w+ in (\w+)\.(?:items|keys|values)\(\)',  # for k in dict.items()
+```
+
+Line 92: Found dict pattern: ['results']
+```
+total_findings = sum(len(findings) for findings in results.values())
+```
+
+## taskra/api/auth.py
+
+Line 29: Found dict pattern: ['JIRA_BASE_URL']
+```
+base_url = os.environ.get('JIRA_BASE_URL')
+```
+
+Line 30: Found dict pattern: ['JIRA_EMAIL']
+```
+email = os.environ.get('JIRA_EMAIL')
+```
+
+Line 31: Found dict pattern: ['JIRA_API_TOKEN']
+```
+token = os.environ.get('JIRA_API_TOKEN')
+```
+
+Line 53: Found dict pattern: ['url']
+```
+'base_url': account['url'],
+```
+
+Line 54: Found dict pattern: ['email']
+```
+'email': account['email'],
+```
+
+Line 55: Found dict pattern: ['token']
+```
+'token': account['token']
+```
+
+## taskra/api/client.py
+
+Line 42: Found dict pattern: ['email', 'token']
+```
+self.session.auth = (auth["email"], auth["token"])
+```
+
+Line 60: Found dict pattern: ['params']
+```
+if "params" in kwargs and kwargs["params"]:
+```
+
+Line 61: Found dict pattern: ['params']
+```
+self.logger.debug(f"Params: {kwargs['params']}")
+```
+
+Line 63: Found dict pattern: ['json']
+```
+if "json" in kwargs and kwargs["json"]:
+```
+
+Line 65: Found dict pattern: ['json']
+```
+json_str = json.dumps(kwargs["json"])
+```
+
+Line 186: Found dict pattern: ['base_url']
+```
+base_url=auth_details['base_url'],
+```
+
+Line 187: Found dict pattern: ['email', 'token']
+```
+auth={'email': auth_details['email'], 'token': auth_details['token']},
+```
+
+## taskra/api/models/base.py
+
+Line 46: Found dict pattern: ['by_alias']
+```
+kwargs["by_alias"] = True
+```
+
+Line 57: Found dict pattern: ['by_alias']
+```
+kwargs["by_alias"] = True
+```
+
+Line 80: Found dict pattern: ['loc']
+```
+error_fields = {err["loc"][0] for err in e.errors()}
+```
+
+## taskra/api/models/comment.py
+
+Line 57: Found dict pattern: ['type']
+```
+if item.get("type") == "text":
+```
+
+Line 61: Found dict pattern: ['content']
+```
+elif "content" in item and isinstance(item["content"], list):
+```
+
+Line 62: Found dict pattern: ['content']
+```
+for child in item["content"]:
+```
+
+Line 65: Found dict pattern: ['type']
+```
+if child.get("type") == "text":
+```
+
+Line 113: Found dict pattern: ['visibility']
+```
+payload["visibility"] = self.visibility.model_dump(by_alias=True)
+```
+
+## taskra/api/models/issue.py
+
+Line 106: Found dict pattern: ['fields', 'description']
+```
+payload["fields"]["description"] = {
+```
+
+Line 123: Found dict pattern: ['fields', 'assignee']
+```
+payload["fields"]["assignee"] = {"accountId": self.assignee}
+```
+
+## taskra/api/services/issues.py
+
+Line 140: Found dict pattern: ['key']
+```
+issue_key = response.get("key")
+```
+
+## taskra/api/services/reports.py
+
+Line 73: Found dict pattern: ['project']
+```
+jql_parts.append(f'project = "{filters["project"]}"')
+```
+
+Line 79: Found dict pattern: ['start_date']
+```
+jql_parts.append(f'created >= "{filters["start_date"]}"')
+```
+
+Line 82: Found dict pattern: ['end_date']
+```
+jql_parts.append(f'created <= "{filters["end_date"]}"')
+```
+
+Line 85: Found dict pattern: ['status']
+```
+if "status" in filters and filters["status"]:
+```
+
+Line 86: Found dict pattern: ['status']
+```
+statuses = ', '.join(f'"{s}"' for s in filters["status"])
+```
+
+Line 91: Found dict pattern: ['assignee']
+```
+jql_parts.append(f'assignee = "{filters["assignee"]}"')
+```
+
+Line 95: Found dict pattern: ['reporter']
+```
+jql_parts.append(f'reporter = "{filters["reporter"]}"')
+```
+
+Line 150: Found dict pattern: ['projects']
+```
+result["projects"][project_key] = {
+```
+
+Line 156: Found dict pattern: ['summary', 'total_issues']
+```
+result["summary"]["total_issues"] += len(issues)
+```
+
+## taskra/cmd/__init__.py
+
+Line 5: Found dict pattern: ['cli']
+```
+__all__ = ["cli"]
+```
+
+## taskra/cmd/commands/config.py
+
+Line 38: Found dict pattern: ['is_default']
+```
+default_mark = "[bold green]✓[/bold green]" if account["is_default"] else ""
+```
+
+Line 40: Found dict pattern: ['name']
+```
+account["name"],
+```
+
+Line 41: Found dict pattern: ['url']
+```
+account["url"],
+```
+
+Line 42: Found dict pattern: ['email']
+```
+account["email"],
+```
+
+Line 163: Found dict pattern: ['name']
+```
+console.print(f"[bold blue]Currently active account:[/bold blue] {account['name']}")
+```
+
+Line 164: Found dict pattern: ['url']
+```
+console.print(f"URL: {account['url']}")
+```
+
+Line 165: Found dict pattern: ['email']
+```
+console.print(f"Email: {account['email']}")
+```
+
+Line 167: Found dict pattern: ['TASKRA_ACCOUNT']
+```
+env_account = os.environ.get("TASKRA_ACCOUNT")
+```
+
+Line 168: Found dict pattern: ['name']
+```
+if env_account and env_account == account["name"]:
+```
+
+## taskra/cmd/commands/issues.py
+
+Line 54: Found dict pattern: ['TASKRA_TESTING']
+```
+if os.environ.get("TASKRA_TESTING") != "1":
+```
+
+Line 103: Found dict pattern: ['started']
+```
+started = worklog["started"]
+```
+
+## taskra/cmd/commands/projects.py
+
+Line 33: Found dict pattern: ['TASKRA_TESTING']
+```
+if os.environ.get("TASKRA_TESTING") != "1":
+```
+
+## taskra/cmd/commands/reports.py
+
+Line 38: Found dict pattern: ['start_date']
+```
+filters["start_date"] = start_date
+```
+
+Line 41: Found dict pattern: ['end_date']
+```
+filters["end_date"] = end_date
+```
+
+## taskra/cmd/commands/tickets.py
+
+Line 51: Found dict pattern: ['start_date']
+```
+filters["start_date"] = start_date
+```
+
+Line 54: Found dict pattern: ['end_date']
+```
+filters["end_date"] = end_date
+```
+
+Line 103: Found dict pattern: ['TASKRA_TESTING']
+```
+if os.environ.get("TASKRA_TESTING") != "1":
+```
+
+## taskra/cmd/commands/worklogs.py
+
+Line 131: Found dict pattern: ['started']
+```
+started = worklog["started"]
+```
+
+Line 166: Found dict pattern: ['comment']
+```
+if isinstance(worklog["comment"], str):
+```
+
+Line 167: Found dict pattern: ['comment']
+```
+comment = worklog["comment"]
+```
+
+Line 168: Found dict pattern: ['comment', 'comment']
+```
+elif isinstance(worklog["comment"], dict) and "content" in worklog["comment"]:
+```
+
+Line 171: Found dict pattern: ['comment']
+```
+comment_content = worklog["comment"].get("content", [])
+```
+
+Line 176: Found dict pattern: ['text']
+```
+text_parts.append(text_node["text"])
+```
+
+Line 184: Found dict pattern: ['started']
+```
+started = worklog.get("started")
+```
+
+## taskra/cmd/utils/formatting.py
+
+Line 24: Found dict pattern: ['content']
+```
+if "content" in node and isinstance(node.get("content"), list):
+```
+
+Line 39: Found dict pattern: ['hardBreak']
+```
+elif node_type in ["hardBreak"]:
+```
+
+Line 88: Found dict pattern: ['marks']
+```
+if "marks" in node and isinstance(node["marks"], list):
+```
+
+Line 89: Found dict pattern: ['marks']
+```
+for mark in node["marks"]:
+```
+
+Line 103: Found dict pattern: ['color']
+```
+color = mark["attrs"].get("color")
+```
+
+Line 103: Found dict pattern: ['attrs']
+```
+color = mark["attrs"].get("color")
+```
+
+Line 109: Found dict pattern: ['href']
+```
+href = mark["attrs"].get("href")
+```
+
+Line 109: Found dict pattern: ['attrs']
+```
+href = mark["attrs"].get("href")
+```
+
+Line 119: Found dict pattern: ['content']
+```
+elif "content" in node and isinstance(node.get("content"), list):
+```
+
+Line 142: Found dict pattern: ['paragraph']
+```
+if node_type in ["paragraph"]:
+```
+
+Line 144: Found dict pattern: ['heading']
+```
+elif node_type in ["heading"]:
+```
+
+Line 158: Found dict pattern: ['content']
+```
+if "content" in doc and isinstance(doc["content"], list):
+```
+
+Line 159: Found dict pattern: ['content']
+```
+for node in doc["content"]:
+```
+
+## taskra/config/account.py
+
+Line 46: Found dict pattern: ['default_account']
+```
+default_account = config.get("default_account")
+```
+
+Line 69: Found dict pattern: ['TASKRA_ACCOUNT']
+```
+env_account = os.environ.get("TASKRA_ACCOUNT")
+```
+
+Line 86: Found dict pattern: ['default_account']
+```
+default_account = config.get("default_account")
+```
+
+Line 194: Found dict pattern: ['accounts']
+```
+config["accounts"] = {}
+```
+
+Line 196: Found dict pattern: ['accounts']
+```
+config["accounts"][name] = {
+```
+
+Line 203: Found dict pattern: ['default_account']
+```
+if not config.get("default_account"):
+```
+
+Line 206: Found dict pattern: ['default_account']
+```
+config["default_account"] = name
+```
+
+Line 216: Found dict pattern: ['accounts']
+```
+print(f"DEBUG: Account in config after update: {name in config['accounts']}")
+```
+
+Line 217: Found dict pattern: ['default_account']
+```
+print(f"DEBUG: Default account after update: {config['default_account']}")
+```
+
+Line 252: Found dict pattern: ['default_account']
+```
+if config.get("default_account") == name:
+```
+
+Line 254: Found dict pattern: ['default_account']
+```
+config["default_account"] = next(iter(accounts))
+```
+
+Line 256: Found dict pattern: ['default_account']
+```
+config["default_account"] = None
+```
+
+Line 284: Found dict pattern: ['default_account']
+```
+config["default_account"] = name
+```
+
+## taskra/core/reports.py
+
+Line 28: Found dict pattern: ['start_date_explicit']
+```
+filters["start_date_explicit"] = "start_date" in filters
+```
+
+Line 29: Found dict pattern: ['end_date_explicit']
+```
+filters["end_date_explicit"] = "end_date" in filters
+```
+
+Line 34: Found dict pattern: ['start_date']
+```
+filters["start_date"] = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+```
+
+Line 36: Found dict pattern: ['start_date_explicit']
+```
+filters["start_date_explicit"] = False
+```
+
+Line 40: Found dict pattern: ['end_date']
+```
+filters["end_date"] = datetime.now().strftime("%Y-%m-%d")
+```
+
+Line 42: Found dict pattern: ['end_date_explicit']
+```
+filters["end_date_explicit"] = False
+```
+
+Line 47: Found dict pattern: ['start_date_explicit', 'end_date_explicit']
+```
+print(f"[DEBUG] Using date filters: {filters['start_date_explicit'] or filters['end_date_explicit']}")
+```
+
+Line 59: Found dict pattern: ['assignee']
+```
+assignee_obj = fields.get("assignee")
+```
+
+Line 66: Found dict pattern: ['status']
+```
+status_obj = fields.get("status")
+```
+
+Line 73: Found dict pattern: ['priority']
+```
+priority_obj = fields.get("priority")
+```
+
+Line 97: Found dict pattern: ['worklog_user']
+```
+if _matches_user(w.get("author", {}), filters["worklog_user"])
+```
+
+Line 99: Found dict pattern: ['worklog_time']
+```
+processed_ticket["worklog_time"] = _format_time_spent(worklog_total)
+```
+
+Line 142: Found dict pattern: ['summary']
+```
+"summary": raw_report["summary"]
+```
+
+Line 146: Found dict pattern: ['projects']
+```
+for project_key, project_data in raw_report["projects"].items():
+```
+
+Line 164: Found dict pattern: ['name']
+```
+"name": project_data["name"],
+```
+
+Line 165: Found dict pattern: ['issues_count']
+```
+"issues_count": project_data["issues_count"],
+```
+
+Line 168: Found dict pattern: ['projects']
+```
+processed_report["projects"][project_key] = processed_project
+```
+
+Line 228: Found dict pattern: ['status']
+```
+status_obj = fields.get("status")
+```
+
+Line 235: Found dict pattern: ['assignee']
+```
+assignee_obj = fields.get("assignee")
+```
+
+## taskra/core/worklogs.py
+
+Line 51: Found dict pattern: ['author']
+```
+if "author" in obj and isinstance(obj["author"], dict):
+```
+
+Line 54: Found dict pattern: ['author', 'author']
+```
+if "display_name" in obj["author"] and "displayName" not in obj["author"]:
+```
+
+Line 55: Found dict pattern: ['author', 'displayName', 'author', 'display_name']
+```
+obj["author"]["displayName"] = obj["author"]["display_name"]
+```
+
+Line 60: Found dict pattern: ['timeSpent', 'time_spent']
+```
+obj["timeSpent"] = obj["time_spent"]
+```
+
+Line 63: Found dict pattern: ['timeSpentSeconds', 'time_spent_seconds']
+```
+obj["timeSpentSeconds"] = obj["time_spent_seconds"]
+```
+
+## taskra/presentation/issues.py
+
+Line 75: Found dict pattern: ['status']
+```
+if "status" in fields and fields["status"]:
+```
+
+Line 76: Found dict pattern: ['status']
+```
+status = fields["status"].get("name", "Unknown")
+```
+
+Line 80: Found dict pattern: ['issuetype']
+```
+if "issuetype" in fields and fields["issuetype"]:
+```
+
+Line 81: Found dict pattern: ['issuetype']
+```
+issue_type = fields["issuetype"].get("name", "Unknown")
+```
+
+Line 85: Found dict pattern: ['priority']
+```
+if "priority" in fields and fields["priority"]:
+```
+
+Line 86: Found dict pattern: ['priority']
+```
+priority = fields["priority"].get("name", "None")
+```
+
+Line 90: Found dict pattern: ['assignee']
+```
+if "assignee" in fields and fields["assignee"]:
+```
+
+Line 91: Found dict pattern: ['assignee']
+```
+assignee = fields["assignee"].get("displayName", "Unknown")
+```
+
+Line 117: Found dict pattern: ['description']
+```
+if "description" in fields and fields["description"]:
+```
+
+Line 118: Found dict pattern: ['description']
+```
+description = fields["description"]
+```
+
+Line 127: Found dict pattern: ['text']
+```
+rich_desc = Text(description["text"])
+```
+
+Line 161: Found dict pattern: ['body']
+```
+if isinstance(comment.get("body"), str):
+```
+
+Line 162: Found dict pattern: ['body']
+```
+console.print(comment.get("body"))
+```
+
+Line 163: Found dict pattern: ['body']
+```
+elif isinstance(comment.get("body"), dict) and "content" in comment.get("body", {}):
+```
+
+Line 164: Found dict pattern: ['body']
+```
+console.print(convert_adf_to_rich_text(comment.get("body")))
+```
+
+## taskra/presentation/reports.py
+
+Line 25: Found dict pattern: ['summary', 'total_issues']
+```
+total_issues = report_data["summary"]["total_issues"]
+```
+
+Line 26: Found dict pattern: ['summary', 'projects_count']
+```
+projects_count = report_data["summary"]["projects_count"]
+```
+
+Line 33: Found dict pattern: ['projects']
+```
+for project_key, project_data in report_data["projects"].items():
+```
+
+Line 34: Found dict pattern: ['name']
+```
+project_name = project_data["name"]
+```
+
+Line 35: Found dict pattern: ['issues']
+```
+issues = project_data["issues"]
+```
+
+Line 54: Found dict pattern: ['key']
+```
+issue["key"],
+```
+
+Line 55: Found dict pattern: ['summary']
+```
+issue["summary"],
+```
+
+Line 56: Found dict pattern: ['status']
+```
+issue["status"],
+```
+
+Line 57: Found dict pattern: ['assignee']
+```
+issue["assignee"],
+```
+
+Line 58: Found dict pattern: ['created']
+```
+issue["created"]
+```
+
+## taskra/presentation/worklogs.py
+
+Line 62: Found dict pattern: ['issueKey']
+```
+issue_column = [worklog["issueKey"]]
+```
+
+Line 104: Found dict pattern: ['comment']
+```
+if isinstance(worklog["comment"], str):
+```
+
+Line 105: Found dict pattern: ['comment']
+```
+comment = worklog["comment"]
+```
+
+Line 106: Found dict pattern: ['comment', 'comment']
+```
+elif isinstance(worklog["comment"], dict) and "content" in worklog["comment"]:
+```
+
+Line 109: Found dict pattern: ['comment']
+```
+comment_content = worklog["comment"].get("content", [])
+```
+
+Line 114: Found dict pattern: ['text']
+```
+text_parts.append(text_node["text"])
+```
+
+## taskra/utils/cache.py
+
+Line 69: Found dict pattern: ['data']
+```
+return cache_data.get("data")
+```
+
+## taskra/utils/model_adapters.py
+
+Line 73: Found dict pattern: ['issueKey', 'issue_key']
+```
+result["issueKey"] = result["issue_key"]
+```
+
+Line 76: Found dict pattern: ['issueSummary', 'issue_summary']
+```
+result["issueSummary"] = result["issue_summary"]
+```
+
+Line 79: Found dict pattern: ['author']
+```
+if "author" in result and isinstance(result["author"], dict):
+```
+
+Line 80: Found dict pattern: ['author']
+```
+author = result["author"]
+```
+
+Line 84: Found dict pattern: ['displayName', 'display_name']
+```
+author["displayName"] = author["display_name"]
+```
+
+Line 88: Found dict pattern: ['timeSpent', 'time_spent']
+```
+result["timeSpent"] = result["time_spent"]
+```
+
+Line 91: Found dict pattern: ['timeSpentSeconds', 'time_spent_seconds']
+```
+result["timeSpentSeconds"] = result["time_spent_seconds"]
+```
+
+Line 130: Found dict pattern: ['displayName', 'display_name']
+```
+result["displayName"] = result["display_name"]
+```
+
+Line 134: Found dict pattern: ['accountId', 'account_id']
+```
+result["accountId"] = result["account_id"]
+```
+
+Line 138: Found dict pattern: ['emailAddress', 'email_address']
+```
+result["emailAddress"] = result["email_address"]
+```
+
+Line 175: Found dict pattern: ['fields']
+```
+fields = result["fields"]
+```
+
+Line 179: Found dict pattern: ['summary', 'summary']
+```
+result["summary"] = fields["summary"]
+```
+
+Line 183: Found dict pattern: ['issueType', 'issuetype']
+```
+result["issueType"] = fields["issuetype"]
+```
+
+Line 186: Found dict pattern: ['status']
+```
+if "status" in fields and isinstance(fields["status"], dict):
+```
+
+Line 187: Found dict pattern: ['status']
+```
+status = fields["status"]
+```
+
+Line 189: Found dict pattern: ['statusName', 'name']
+```
+result["statusName"] = status["name"]
+```
+
+Line 226: Found dict pattern: ['projectTypeKey', 'project_type_key']
+```
+result["projectTypeKey"] = result["project_type_key"]
+```
+
+Line 229: Found dict pattern: ['lead']
+```
+if "lead" in result and isinstance(result["lead"], dict):
+```
+
+Line 230: Found dict pattern: ['lead']
+```
+lead = result["lead"]
+```
+
+Line 232: Found dict pattern: ['displayName', 'display_name']
+```
+lead["displayName"] = lead["display_name"]
+```
+
+Line 269: Found dict pattern: ['textContent']
+```
+result["textContent"] = comment.text_content
+```
+
+Line 272: Found dict pattern: ['body']
+```
+body = result["body"]
+```
+
+Line 277: Found dict pattern: ['content']
+```
+for item in body["content"]:
+```
+
+Line 279: Found dict pattern: ['content']
+```
+for child in item["content"]:
+```
+
+Line 280: Found dict pattern: ['type']
+```
+if child.get("type") == "text":
+```
+
+Line 282: Found dict pattern: ['textContent']
+```
+result["textContent"] = " ".join(text_parts)
+```
+
+Line 284: Found dict pattern: ['textContent']
+```
+result["textContent"] = "Complex comment format"
+```
+
+Line 286: Found dict pattern: ['textContent']
+```
+result["textContent"] = body
+```
+
+Line 289: Found dict pattern: ['author']
+```
+if "author" in result and isinstance(result["author"], dict):
+```
+
+Line 290: Found dict pattern: ['author']
+```
+author = result["author"]
+```
+
+Line 292: Found dict pattern: ['displayName', 'display_name']
+```
+author["displayName"] = author["display_name"]
+```
+
+## taskra/utils/model_cache.py
+
+Line 137: Found dict pattern: ['data']
+```
+data = cache_data.get("data")
+```
+
