@@ -1,6 +1,6 @@
 # Makefile for running Taskra tests
 
-.PHONY: tests test-unit test-integration test-config test-api test-core test-cmd test-account clean
+.PHONY: tests test-unit test-integration test-config test-api test-core test-cmd test-account test-worklogs clean
 
 # Default Python command
 PYTHON := python
@@ -37,6 +37,10 @@ test-api-models:
 # Run core functionality tests
 test-core:
 	$(PYTEST) tests/unit/core/
+
+# Run worklog tests
+test-worklogs:
+	$(PYTEST) tests/core/test_worklogs.py
 
 # Run command line tests
 test-cmd:
@@ -86,6 +90,7 @@ help:
 	@echo "  test-api-services: Run API services tests"
 	@echo "  test-api-models  : Run API models tests"
 	@echo "  test-core        : Run core functionality tests"
+	@echo "  test-worklogs    : Run worklog tests"
 	@echo "  test-cmd         : Run command line tests"
 	@echo "  test-account     : Run account management tests"
 	@echo "  test-config-manager: Run config manager tests"

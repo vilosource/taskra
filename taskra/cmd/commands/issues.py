@@ -37,7 +37,7 @@ def issue_cmd(issue_key, json, debug, worklogs, start_date, end_date, all_time):
             console.print(json_lib.dumps(issue_data, indent=2, default=str))
             return
             
-        console.print(f"[bold blue]Issue {issue_key}[/bold blue]")
+        console.print(f"[bold blue]Issue details for {issue_key}[/bold blue]")
         issue_data = get_issue(issue_key)
         fields = issue_data.get("fields", {})
         

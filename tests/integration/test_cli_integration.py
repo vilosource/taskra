@@ -95,8 +95,14 @@ class TestCliIntegration:
             # Verify our mock was called with the right argument
             mock_get_issue.assert_called_once_with("TEST-123")
     
-    @pytest.mark.skipif(not os.environ.get("RUN_LIVE_TESTS"), 
-                       reason="Live tests disabled. Set RUN_LIVE_TESTS=1 to enable.")
+    @pytest.mark.skipif(
+        not os.environ.get("RUN_LIVE_TESTS") or 
+        not os.environ.get("TEST_PROJECT_KEY") or
+        not os.environ.get("JIRA_BASE_URL") or
+        not os.environ.get("JIRA_API_TOKEN") or
+        not os.environ.get("JIRA_EMAIL"),
+        reason="Live tests disabled. Set RUN_LIVE_TESTS=1 and required environment variables to enable."
+    )
     def test_end_to_end_workflow(self, runner):
         """
         Test a complete workflow with real API calls.
@@ -115,7 +121,6 @@ class TestCliIntegration:
         
         # Get a project key from the output or use the test one
         project_key = os.environ.get("TEST_PROJECT_KEY")
-        assert project_key, "TEST_PROJECT_KEY environment variable must be set"
         
         # Create an issue
         with patch("builtins.input", side_effect=["Test Issue", "This is a test issue"]):
