@@ -1,13 +1,15 @@
 """Client for interacting with the Jira REST API."""
 
+import os
 import json
 import logging
 import requests
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union
 from urllib.parse import urljoin
+from requests.auth import HTTPBasicAuth
 
-from .auth import get_auth_details
-
+# Set up logger
+logger = logging.getLogger("jira_client")
 
 class JiraClient:
     """
@@ -16,13 +18,14 @@ class JiraClient:
     Handles authentication and HTTP operations against the Jira API endpoints.
     """
     
-    def __init__(self, base_url: str, auth: Dict[str, str], debug: bool = False):
+    def __init__(self, base_url: str, email: str, api_token: str, debug: bool = False):
         """
         Initialize a new Jira client.
         
         Args:
             base_url: Base URL for the Jira instance (e.g., https://mycompany.atlassian.net)
-            auth: Authentication details (email and token)
+            email: User email for authentication
+            api_token: API token for authentication
             debug: Enable debug output
         """
         self.debug = debug
@@ -37,9 +40,9 @@ class JiraClient:
         else:
             self.base_url = base_url
             
-        self.auth = auth
+        self.auth = HTTPBasicAuth(email, api_token)
         self.session = requests.Session()
-        self.session.auth = (auth["email"], auth["token"])
+        self.session.auth = self.auth
         self.session.headers.update({
             "Accept": "application/json",
             "Content-Type": "application/json"
@@ -80,7 +83,7 @@ class JiraClient:
             content = f"{content[:1000]}... (truncated)"
         self.logger.debug(f"Content: {content}")
     
-    def get(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def get(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Union[Dict[str, Any], list]:
         """
         Make a GET request to the Jira API.
         
@@ -89,7 +92,7 @@ class JiraClient:
             params: Optional query parameters
             
         Returns:
-            Response data as dictionary
+            Response data as dictionary or list
         """
         url = urljoin(self.base_url, endpoint)
         self._log_request("GET", url, params=params)
@@ -168,22 +171,25 @@ class JiraClient:
         response.raise_for_status()
 
 
-def get_client(debug: bool = False) -> JiraClient:
+# Global client instance
+_jira_client = None
+
+def get_jira_client() -> JiraClient:
     """
-    Factory function to create a JiraClient from environment variables or configuration.
+    Get a singleton instance of the JiraClient.
     
-    Checks for environment variables first, then falls back to configuration.
-    
-    Args:
-        debug: Enable debug output
-        
     Returns:
-        Configured JiraClient instance
+        JiraClient instance
     """
-    auth_details = get_auth_details()
+    global _jira_client
     
-    return JiraClient(
-        base_url=auth_details['base_url'],
-        auth={'email': auth_details['email'], 'token': auth_details['token']},
-        debug=debug
-    )
+    if _jira_client is None:
+        # Load credentials from environment variables or configuration
+        base_url = os.environ.get("JIRA_BASE_URL", "https://optiscangroup.atlassian.net/rest/api/3")
+        email = os.environ.get("JIRA_EMAIL", "")
+        api_token = os.environ.get("JIRA_API_TOKEN", "")
+        
+        # Create client
+        _jira_client = JiraClient(base_url, email, api_token)
+        
+    return _jira_client

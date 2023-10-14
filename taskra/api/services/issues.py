@@ -1,7 +1,7 @@
 """Issue service for interacting with Jira issues API."""
 
 from typing import Dict, List, Any, Optional, Union
-from ..models.issue import Issue, IssueFields, IssueCreate
+from ..models.issue import Issue, IssueFields, IssueCreate, IssueSearchResults
 from ...utils.serialization import to_serializable
 from .base import BaseService
 
@@ -22,25 +22,58 @@ class IssuesService(BaseService):  # Renamed from IssueService to IssuesService
         response = self.client.get(endpoint)
         return Issue.from_api(response)
     
-    def search_issues(self, jql: str, max_results: int = 50) -> List[Issue]:
+    def search_issues(
+        self, 
+        jql: str, 
+        start_at: int = 0, 
+        max_results: int = 50, 
+        fields: Optional[List[str]] = None,
+        debug: bool = False,
+        **kwargs
+    ) -> IssueSearchResults:
         """
-        Search for issues using JQL.
+        Search issues using JQL.
         
         Args:
             jql: JQL query string
+            start_at: Index of the first result to return (for pagination)
             max_results: Maximum number of results to return
+            fields: List of field names to include in the response
+            debug: Enable debug output
+            **kwargs: Additional parameters to pass to the API
             
         Returns:
-            List of Issue models
+            IssueSearchResults object containing the search results
         """
-        endpoint = self._get_endpoint("search")
         params = {
             "jql": jql,
-            "maxResults": max_results
+            "startAt": start_at,
+            "maxResults": max_results,
         }
-        response = self.client.get(endpoint, params=params)
-        issues_data = response.get("issues", [])
-        return [Issue.from_api(issue_data) for issue_data in issues_data]
+        
+        if fields is not None:
+            params["fields"] = ",".join(fields)
+            
+        # Add any additional parameters
+        params.update({k: v for k, v in kwargs.items() if v is not None})
+        
+        response = self.client.get("/rest/api/3/search", params=params)
+        
+        # Check if response is already a dict (meaning the client might have already parsed it)
+        if isinstance(response, dict):
+            response_data = response
+        else:
+            response_data = response.json()
+        
+        # Debug the structure of the first issue if requested
+        if debug and "issues" in response_data and response_data["issues"]:
+            from ...utils.debug import dump_model_structure
+            print("\nDEBUG: First issue structure:")
+            first_issue = response_data["issues"][0]
+            dump_model_structure(first_issue)
+
+        # Create model instance
+        return IssueSearchResults.model_validate(response_data)
         
     def get_comments(self, issue_key: str, start_at: int = 0, 
                     max_results: int = 50, get_all: bool = True) -> List[Dict[str, Any]]:

@@ -25,17 +25,45 @@ class IssueStatus(BaseJiraModel):
     status_category: Optional[Dict[str, Any]] = Field(None, alias="statusCategory")
 
 class IssueFields(BaseJiraModel):
-    """Fields of a Jira issue."""
+    """Fields for an issue."""
+    summary: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[IssueStatus] = None
+    assignee: Optional[User] = None
+    priority: Optional[Dict[str, Any]] = None  # Priority can have a complex structure
+    created: Optional[datetime] = None
+    updated: Optional[datetime] = None
     
-    summary: str = Field(..., description="Issue summary")
-    description: Optional[Dict[str, Any]] = Field(None, description="Issue description in ADF format")
-    issue_type: IssueType = Field(..., alias="issuetype", description="Issue type")
-    status: IssueStatus = Field(default_factory=IssueStatus, description="Current issue status") # Default factory added
-    assignee: Optional[User] = Field(None, description="User assigned to the issue")
-    reporter: Optional[User] = Field(None, description="User who reported the issue")
-    created: datetime = Field(default_factory=datetime.now, description="When the issue was created") # Default factory added
-    updated: datetime = Field(default_factory=datetime.now, description="When the issue was last updated") # Default factory added
-    # Add other fields as needed
+    # Allow any additional fields to be stored dynamically
+    model_config = {
+        "extra": "allow",
+    }
+    
+    def get_status_name(self) -> str:
+        """Get status name with fallback."""
+        if self.status and hasattr(self.status, "name"):
+            return self.status.name
+        # Direct string access as fallback
+        if isinstance(self.status, dict) and "name" in self.status:
+            return self.status["name"]
+        return "Unknown"
+        
+    def get_assignee_name(self) -> str:
+        """Get assignee display name with fallback."""
+        if self.assignee and hasattr(self.assignee, "display_name"):
+            return self.assignee.display_name
+        if self.assignee and hasattr(self.assignee, "emailAddress"):
+            return self.assignee.emailAddress
+        # Direct dictionary access as fallback
+        if isinstance(self.assignee, dict):
+            return self.assignee.get("displayName") or self.assignee.get("emailAddress", "Unassigned")
+        return "Unassigned"
+        
+    def get_priority_name(self) -> str:
+        """Get priority name with fallback."""
+        if isinstance(self.priority, dict) and "name" in self.priority:
+            return self.priority["name"]
+        return "Unknown"
 
 class Issue(ApiResource):
     """
@@ -43,10 +71,15 @@ class Issue(ApiResource):
     
     API Endpoint: /rest/api/3/issue/{issueIdOrKey}
     """
+    id: str
+    key: str
+    self_url: str = Field(..., alias="self")
+    fields: IssueFields
     
-    id: str = Field(..., description="Issue ID")
-    key: str = Field(..., description="Issue key (e.g., 'PROJECT-123')")
-    fields: IssueFields = Field(..., description="Issue fields")
+    @property
+    def self(self) -> str:
+        """Property getter for backward compatibility."""
+        return self.self_url
 
 class IssueSummary(BaseJiraModel):
     """
@@ -123,3 +156,15 @@ class IssueCreate(BaseJiraModel):
             payload["fields"]["assignee"] = {"accountId": self.assignee}
             
         return payload
+
+class IssueSearchResults(BaseJiraModel):
+    """
+    Search results from the Jira search API.
+    
+    API Endpoint: /rest/api/3/search
+    """
+    expand: Optional[str] = None
+    start_at: int = Field(..., alias="startAt")
+    max_results: int = Field(..., alias="maxResults")
+    total: int
+    issues: List[Issue]

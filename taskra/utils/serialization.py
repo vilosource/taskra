@@ -7,165 +7,127 @@ for datetime objects, nested models, and other non-serializable types.
 """
 
 import json
-import logging
-from datetime import datetime, date, time
-from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple, Set, Union, TypeVar, Type
-from pydantic import BaseModel
+from datetime import datetime, date
+from typing import Any, Dict, List, Optional, Union, Type, TypeVar, cast
 
-# Type for anything that might be serializable
-SerializableType = Union[Dict, List, Tuple, Set, str, int, float, bool, None]
+# Type variable for generic model deserialization
+T = TypeVar('T')
 
-
-def to_serializable(obj: Any) -> SerializableType:
+def to_serializable(obj: Any) -> Any:
     """
     Convert any object to a JSON-serializable format.
     
-    This function recursively converts Pydantic models, datetime objects,
-    and other complex types into JSON-serializable dictionaries, lists,
-    and primitive values.
+    Handles Pydantic models, datetime objects, and other complex types.
     
     Args:
-        obj: The object to convert
+        obj: Any Python object
         
     Returns:
-        A JSON-serializable version of the object
+        JSON-serializable version of the object
     """
     # Handle None
     if obj is None:
         return None
-    
-    # Handle Pydantic models
-    if isinstance(obj, BaseModel):
-        # For Pydantic models, use the model_dump_api method if available
-        if hasattr(obj, 'model_dump_api'):
-            result = obj.model_dump_api()
-        else:
-            # Fall back to model_dump with by_alias=True
-            if hasattr(obj, 'model_dump'):
-                # Pydantic v2
-                result = obj.model_dump(by_alias=True)
-            else:
-                # Pydantic v1
-                result = obj.dict(by_alias=True)
         
-        # Process the result to handle any nested objects
+    # Handle Pydantic models (v2 onlyear
+
+    if hasattr(obj, 'model_dump'):
+        # Use Pydantic v2 method
+        result = obj.model_dump(by_alias=True)
         return to_serializable(result)
-    
+        
     # Handle datetime objects
-    if isinstance(obj, (datetime, date, time)):
+    if isinstance(obj, (datetime, date)):
         return obj.isoformat()
-    
-    # Handle other objects with isoformat method
-    if hasattr(obj, 'isoformat') and callable(obj.isoformat):
-        return obj.isoformat()
-    
-    # Handle enums
-    if isinstance(obj, Enum):
-        return obj.value
-    
-    # Handle collections
-    if isinstance(obj, dict):
-        return {str(k): to_serializable(v) for k, v in obj.items()}
-    
+        
+    # Handle lists
     if isinstance(obj, list):
         return [to_serializable(item) for item in obj]
-    
-    if isinstance(obj, tuple):
-        return tuple(to_serializable(item) for item in obj)
-    
+        
+    # Handle dictionaries
+    if isinstance(obj, dict):
+        return {k: to_serializable(v) for k, v in obj.items()}
+        
+    # Handle sets
     if isinstance(obj, set):
-        return {to_serializable(item) for item in obj}
-    
-    # Handle objects with __dict__ attribute
-    if hasattr(obj, '__dict__'):
-        try:
-            return to_serializable(obj.__dict__)
-        except Exception as e:
-            logging.warning(f"Failed to serialize {type(obj)} using __dict__: {e}")
-    
-    # Try to directly serialize (for primitive types)
-    try:
-        json.dumps(obj)
-        return obj
-    except (TypeError, OverflowError):
-        # If this fails, convert to string as fallback
-        return str(obj)
-
+        return [to_serializable(item) for item in obj]
+        
+    # Return primitive types as-is
+    return obj
 
 def serialize_to_json(obj: Any, **kwargs) -> str:
     """
-    Serialize any object to a JSON string.
+    Convert any object to a JSON string.
     
     Args:
-        obj: The object to serialize
+        obj: Any Python object
         **kwargs: Additional arguments to pass to json.dumps
         
     Returns:
-        JSON string representation of the object
+        JSON string representation
     """
-    serializable_obj = to_serializable(obj)
-    return json.dumps(serializable_obj, **kwargs)
+    return json.dumps(to_serializable(obj), **kwargs)
 
-
-def deserialize_datetime(value: str) -> datetime:
+def deserialize_datetime(value: Optional[str]) -> Optional[datetime]:
     """
-    Convert a string to a datetime object.
+    Deserialize an ISO format datetime string.
     
     Args:
-        value: ISO-formatted datetime string
+        value: ISO format datetime string or None
         
     Returns:
-        datetime object
-    
-    Raises:
-        ValueError: If the string cannot be parsed as a datetime
+        datetime object or None
     """
+    if not value:
+        return None
+        
     try:
         return datetime.fromisoformat(value)
     except ValueError:
-        # Handle special cases or alternative formats here
-        # For example, try different formats or cleanup the string
-        
-        # Try without microseconds or timezone
-        if 'T' in value:
-            date_part, time_part = value.split('T', 1)
-            time_part = time_part.split('.')[0]  # Remove microseconds
-            cleaned_value = f"{date_part}T{time_part}"
-            try:
-                return datetime.fromisoformat(cleaned_value)
-            except ValueError:
-                pass
-        
-        # Re-raise if all attempts fail
-        raise ValueError(f"Cannot parse datetime from string: {value}")
+        # Handle different ISO formats
+        try:
+            # Try with UTC 'Z' format
+            if value.endswith('Z'):
+                value = value[:-1] + '+00:00'
+            return datetime.fromisoformat(value)
+        except ValueError:
+            # If all else fails, return None rather than crashing
+            return None
 
-
-M = TypeVar('M', bound=BaseModel)
-
-def deserialize_model(model_class: Type[M], data: Dict[str, Any]) -> M:
+def deserialize_model(data: Any, model_class: Type[T]) -> T:
     """
-    Deserialize a dictionary into a Pydantic model instance.
+    Deserialize data into a Pydantic model.
     
-    This function handles pre-processing of data before passing to
-    the Pydantic model constructor, such as converting ISO datetime
-    strings to datetime objects for fields that require it.
+    This function handles common deserialization patterns and edge cases
+    when converting data (dict, JSON string, etc.) to Pydantic models.
     
     Args:
-        model_class: The Pydantic model class
-        data: Dictionary containing data to deserialize
+        data: Source data (dict, JSON string, or another model)
+        model_class: Target Pydantic model class
         
     Returns:
-        An instance of the model_class
+        An instance of the specified model class
+    
+    Raises:
+        ValueError: If data cannot be deserialized to the model
     """
+    # Handle None case
+    if data is None:
+        raise ValueError(f"Cannot deserialize None to {model_class.__name__}")
+    
+    # If data is already an instance of the target class, return it
+    if isinstance(data, model_class):
+        return data
+    
+    # If data is a JSON string, parse it first
+    if isinstance(data, str):
+        try:
+            data = json.loads(data)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON string: {e}")
+    
+    # Only handle Pydantic v2 models
     try:
         return model_class.model_validate(data)
     except Exception as e:
-        logging.warning(f"Error deserializing to {model_class.__name__}: {e}")
-        
-        # Try with more lenient validation
-        try:
-            return model_class.model_validate(data, mode='lenient')
-        except Exception as e2:
-            logging.error(f"Failed to deserialize with lenient mode: {e2}")
-            raise
+        raise ValueError(f"Failed to deserialize to {model_class.__name__}: {e}")
