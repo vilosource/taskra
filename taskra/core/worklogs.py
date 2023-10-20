@@ -36,3 +36,26 @@ def list_worklogs(issue_key):
     client = get_client()
     worklog_service = WorklogService(client)
     return worklog_service.list_worklogs(issue_key)
+
+def get_user_worklogs(username=None, start_date=None, end_date=None, debug_level='none'):
+    """
+    Get worklogs for a user.
+    
+    Args:
+        username: The username (defaults to current user if None)
+        start_date: Start date in format 'YYYY-MM-DD' (defaults to yesterday if None)
+        end_date: End date in format 'YYYY-MM-DD' (defaults to today if None)
+        debug_level: Debug output level ('none', 'error', 'info', 'verbose')
+        
+    Returns:
+        list: Worklog entries for the user
+    """
+    # Pass debug=True only for info or verbose levels
+    client = get_client(debug=(debug_level in ['info', 'verbose']))
+    worklog_service = WorklogService(client)
+    return worklog_service.get_user_worklogs(
+        username=username,
+        start_date=start_date,
+        end_date=end_date,
+        debug_level=debug_level
+    )

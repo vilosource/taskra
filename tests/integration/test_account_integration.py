@@ -11,8 +11,11 @@ from taskra.config.account import (
     get_current_account,
     add_account,
     remove_account,
-    set_default_account
+    set_default_account,
+    validate_credentials
 )
+from taskra.api.client import JiraClient
+from taskra.api.services.users import UserService
 
 
 class TestAccountIntegration:
@@ -32,13 +35,9 @@ class TestAccountIntegration:
     @pytest.fixture
     def mock_validation(self):
         """Mock the validation of Jira credentials."""
-        with patch("taskra.config.account.JiraClient"):
-            # Create a mock UserService that always validates successfully
-            mock_service = pytest.MockFixture.MagicMock()
-            mock_service.validate_credentials.return_value = True
-            
-            with patch("taskra.config.account.UserService", return_value=mock_service):
-                yield
+        # Patch the validate_credentials function directly instead of trying to patch JiraClient
+        with patch("taskra.config.account.validate_credentials", return_value=True):
+            yield
     
     def test_account_management_workflow(self, setup_config_manager, mock_validation):
         """Test the entire account management workflow."""

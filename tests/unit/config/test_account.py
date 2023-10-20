@@ -2,7 +2,7 @@
 
 import os
 import pytest
-from unittest.mock import patch, Mock
+from unittest.mock import patch, Mock, MagicMock
 
 from taskra.config.account import (
     list_accounts,
@@ -10,8 +10,10 @@ from taskra.config.account import (
     add_account,
     remove_account,
     set_default_account,
-    get_subdomain_from_url
+    get_subdomain_from_url,
 )
+from taskra.api.client import JiraClient  # Add proper import
+from taskra.api.services.users import UserService  # Add proper import
 
 
 class TestAccountManagement:
@@ -105,7 +107,7 @@ class TestAccountManagement:
         account = get_current_account()
         assert account is None
 
-    def test_add_first_account(self, monkeypatch, mock_user_service):
+    def test_add_first_account(self, monkeypatch):
         """Test adding the first account (should become default)."""
         # Mock empty config
         monkeypatch.setattr("taskra.config.account.config_manager.read_config", 
@@ -119,9 +121,8 @@ class TestAccountManagement:
             return updated_config
         monkeypatch.setattr("taskra.config.account.config_manager.update_config", mock_update_config)
         
-        # Mock JiraClient and UserService
-        monkeypatch.setattr("taskra.config.account.JiraClient", lambda *args, **kwargs: None)
-        monkeypatch.setattr("taskra.config.account.UserService", lambda *args: mock_user_service)
+        # Mock validate_credentials to return True
+        monkeypatch.setattr("taskra.config.account.validate_credentials", lambda *args, **kwargs: True)
         
         success, _ = add_account("https://test.atlassian.net", "test@example.com", "api-token")
         
@@ -131,7 +132,7 @@ class TestAccountManagement:
         assert updated_config["accounts"]["test"]["url"] == "https://test.atlassian.net"
         assert updated_config["accounts"]["test"]["email"] == "test@example.com"
 
-    def test_add_account_custom_name(self, monkeypatch, mock_user_service):
+    def test_add_account_custom_name(self, monkeypatch):
         """Test adding an account with a custom name."""
         # Mock config
         monkeypatch.setattr("taskra.config.account.config_manager.read_config", 
@@ -145,9 +146,8 @@ class TestAccountManagement:
             return updated_config
         monkeypatch.setattr("taskra.config.account.config_manager.update_config", mock_update_config)
         
-        # Mock JiraClient and UserService
-        monkeypatch.setattr("taskra.config.account.JiraClient", lambda *args, **kwargs: None)
-        monkeypatch.setattr("taskra.config.account.UserService", lambda *args: mock_user_service)
+        # Mock validate_credentials to return True
+        monkeypatch.setattr("taskra.config.account.validate_credentials", lambda *args, **kwargs: True)
         
         success, _ = add_account("https://test.atlassian.net", "test@example.com", "api-token", name="custom")
         
@@ -157,10 +157,8 @@ class TestAccountManagement:
 
     def test_add_account_validation_failure(self, monkeypatch):
         """Test adding an account with invalid credentials."""
-        # Mock UserService to fail validation
-        mock_service = Mock()
-        mock_service.validate_credentials.return_value = False
-        monkeypatch.setattr("taskra.config.account.UserService", lambda *args: mock_service)
+        # Mock validate_credentials to return False
+        monkeypatch.setattr("taskra.config.account.validate_credentials", lambda *args, **kwargs: False)
         
         # Try to add an account with invalid credentials
         success, message = add_account("https://test.atlassian.net", "test@example.com", "bad-token")
@@ -179,20 +177,28 @@ class TestAccountManagement:
             "default_account": "account1"
         }
         
-        # Capture the updated configuration
+        # Mock the read_config to return our test config
+        monkeypatch.setattr("taskra.config.account.config_manager.read_config", lambda: mock_config)
+        
+        # Mock the update_config to track the function was called correctly
         updated_config = {}
+        
         def mock_update_config(update_func):
             nonlocal updated_config
-            updated_config = update_func(mock_config)
-            return updated_config
-        
+            # Apply the update function to our mock config
+            result = update_func(mock_config.copy())
+            updated_config = result
+            return result
+            
         monkeypatch.setattr("taskra.config.account.config_manager.update_config", mock_update_config)
         
-        remove_account("account2")
+        # Call remove_account
+        success, _ = remove_account("account2")
         
+        assert success
         assert "account2" not in updated_config["accounts"]
         assert "account1" in updated_config["accounts"]
-        assert updated_config["default_account"] == "account1"  # Unchanged
+        assert updated_config["default_account"] == "account1"  # Default should remain unchanged
 
     def test_remove_default_account(self, monkeypatch):
         """Test removing the default account."""
@@ -205,20 +211,28 @@ class TestAccountManagement:
             "default_account": "account1"
         }
         
-        # Capture the updated configuration
+        # Mock the read_config to return our test config
+        monkeypatch.setattr("taskra.config.account.config_manager.read_config", lambda: mock_config)
+        
+        # Mock the update_config to track the function was called correctly
         updated_config = {}
+        
         def mock_update_config(update_func):
             nonlocal updated_config
-            updated_config = update_func(mock_config)
-            return updated_config
-        
+            # Apply the update function to our mock config
+            result = update_func(mock_config.copy())
+            updated_config = result
+            return result
+            
         monkeypatch.setattr("taskra.config.account.config_manager.update_config", mock_update_config)
         
-        remove_account("account1")
+        # Call remove_account
+        success, _ = remove_account("account1")
         
+        assert success
         assert "account1" not in updated_config["accounts"]
         assert "account2" in updated_config["accounts"]
-        assert updated_config["default_account"] == "account2"  # Should change to the other account
+        assert updated_config["default_account"] == "account2"  # Default should change
 
     def test_remove_last_account(self, monkeypatch):
         """Test removing the last remaining account."""
@@ -230,20 +244,27 @@ class TestAccountManagement:
             "default_account": "account1"
         }
         
-        # Capture the updated configuration
+        # Mock the read_config to return our test config
+        monkeypatch.setattr("taskra.config.account.config_manager.read_config", lambda: mock_config)
+        
+        # Mock the update_config to track the function was called correctly
         updated_config = {}
+        
         def mock_update_config(update_func):
             nonlocal updated_config
-            updated_config = update_func(mock_config)
-            return updated_config
-        
+            # Apply the update function to our mock config
+            result = update_func(mock_config.copy())
+            updated_config = result
+            return result
+            
         monkeypatch.setattr("taskra.config.account.config_manager.update_config", mock_update_config)
         
-        remove_account("account1")
+        # Call remove_account
+        success, _ = remove_account("account1")
         
-        assert "account1" not in updated_config["accounts"]
+        assert success
         assert len(updated_config["accounts"]) == 0
-        assert updated_config["default_account"] is None  # Should be None when no accounts remain
+        assert updated_config["default_account"] is None
 
     def test_set_default_account(self, monkeypatch):
         """Test setting the default account."""

@@ -40,3 +40,18 @@ def create_issue(project_key, summary, description, issue_type="Task"):
         description=description,
         issue_type=issue_type
     )
+
+def get_issue_comments(issue_key, get_all=True):
+    """
+    Get comments for a specific issue.
+    
+    Args:
+        issue_key: The JIRA issue key (e.g., PROJECT-123)
+        get_all: If True, retrieve all comments
+        
+    Returns:
+        list: Issue comments
+    """
+    client = get_client()
+    issues_service = IssuesService(client)
+    return issues_service.get_comments(issue_key, get_all=get_all)

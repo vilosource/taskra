@@ -15,15 +15,15 @@ class TestProjectsService:
         # Create a mock client
         mock_client = Mock()
         
-        # Set up the mock to return a sample response
+        # Set up the mock to return a sample response with required projectTypeKey field
         mock_response = {
             "startAt": 0,
             "maxResults": 50,
             "total": 2,
             "isLast": True,
             "values": [
-                {"id": "10000", "key": "TEST", "name": "Test Project"},
-                {"id": "10001", "key": "DEMO", "name": "Demo Project"}
+                {"id": "10000", "key": "TEST", "name": "Test Project", "projectTypeKey": "software"},
+                {"id": "10001", "key": "DEMO", "name": "Demo Project", "projectTypeKey": "business"}
             ]
         }
         mock_client.get.return_value = mock_response
@@ -48,7 +48,7 @@ class TestProjectsService:
         # Create a mock client
         mock_client = Mock()
         
-        # Set up the mock to return multiple pages of results
+        # Set up the mock to return multiple pages of results with required projectTypeKey field
         mock_responses = [
             # First page
             {
@@ -57,8 +57,8 @@ class TestProjectsService:
                 "total": 5,
                 "isLast": False,
                 "values": [
-                    {"id": "10000", "key": "TEST1", "name": "Test Project 1"},
-                    {"id": "10001", "key": "TEST2", "name": "Test Project 2"}
+                    {"id": "10000", "key": "TEST1", "name": "Test Project 1", "projectTypeKey": "software"},
+                    {"id": "10001", "key": "TEST2", "name": "Test Project 2", "projectTypeKey": "software"}
                 ]
             },
             # Second page
@@ -68,8 +68,8 @@ class TestProjectsService:
                 "total": 5,
                 "isLast": False,
                 "values": [
-                    {"id": "10002", "key": "TEST3", "name": "Test Project 3"},
-                    {"id": "10003", "key": "TEST4", "name": "Test Project 4"}
+                    {"id": "10002", "key": "TEST3", "name": "Test Project 3", "projectTypeKey": "software"},
+                    {"id": "10003", "key": "TEST4", "name": "Test Project 4", "projectTypeKey": "software"}
                 ]
             },
             # Third page
@@ -79,7 +79,7 @@ class TestProjectsService:
                 "total": 5,
                 "isLast": True,
                 "values": [
-                    {"id": "10004", "key": "TEST5", "name": "Test Project 5"}
+                    {"id": "10004", "key": "TEST5", "name": "Test Project 5", "projectTypeKey": "software"}
                 ]
             }
         ]

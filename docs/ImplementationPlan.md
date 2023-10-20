@@ -1,28 +1,112 @@
-# Configuration Testing Implementation Plan
+# Taskra: Implementation Plan
 
-This document outlines the plan for implementing tests for Taskra's configuration management system.
+This document outlines the comprehensive implementation plan for Taskra, covering configuration management, testing strategy, and development workflow.
 
-## Overview
+## 1. Configuration Management Implementation
 
-The configuration manager handles reading, writing, and updating configuration data for Taskra, including account management. Our testing plan will ensure this functionality works reliably and correctly.
+### 1.1 Overview
 
-## Test Structure
+The configuration manager handles reading, writing, and updating configuration data for Taskra, including account management. Our implementation provides:
+
+- Storage and management of multiple Jira account credentials
+- Account switching capability
+- Environment variable overrides
+- Secure credential handling
+
+### 1.2 Core Components
+
+#### ConfigManager Class
+
+A centralized class for handling configuration file operations:
+
+```python
+class ConfigManager:
+    """Configuration manager for Taskra."""
+    
+    def __init__(self, config_dir=None, config_file="config.json", debug=False):
+        """Initialize with configurable location."""
+        # ...existing code...
+    
+    def read_config(self):
+        """Read configuration from file with fallback to default."""
+        # ...existing code...
+    
+    def write_config(self, config):
+        """Write configuration to file safely."""
+        # ...existing code...
+        
+    def update_config(self, update_func):
+        """Update configuration using a transaction-like function."""
+        # ...existing code...
+```
+
+#### Account Management Module
+
+Functions for managing Jira accounts:
+
+```python
+# Account operations
+def list_accounts() -> List[Dict[str, Any]]:
+    """List all configured accounts."""
+    # ...existing code...
+
+def add_account(url, email, token, name=None, debug=False) -> Tuple[bool, str]:
+    """Add a new account, optionally setting as default."""
+    # ...existing code...
+
+def remove_account(name) -> Tuple[bool, str]:
+    """Remove an account, updating default if needed."""
+    # ...existing code...
+```
+
+### 1.3 Configuration Data Structure
+
+```json
+{
+  "default_account": "mycompany",
+  "accounts": {
+    "mycompany": {
+      "url": "https://mycompany.atlassian.net",
+      "email": "user@example.com",
+      "token": "your-api-token" 
+    }
+  },
+  "settings": {
+    "timeout": 30,
+    "cache_ttl": 300
+  }
+}
+```
+
+### 1.4 CLI Integration
+
+Configure command group with subcommands:
+- `taskra config list`: List all configured accounts
+- `taskra config add`: Add a new Jira account
+- `taskra config remove`: Remove an account
+- `taskra config default`: Set the default account
+- `taskra config current`: Show the currently active account
+
+## 2. Testing Strategy
+
+### 2.1 Testing Approach
+
+Taskra follows a comprehensive testing strategy:
+
+- **Unit tests**: Test individual components in isolation
+- **Integration tests**: Verify components work correctly together
+- **End-to-end tests**: Test complete workflows (optional, using live API)
+- **Mock-based testing**: Avoid dependencies on external services
+
+### 2.2 Test Structure
 
 Tests will be organized into two main categories:
 1. **ConfigManager Tests**: Testing the low-level configuration file operations
 2. **Account Management Tests**: Testing the higher-level account operations
 
-## Testing Approach
+### 2.3 Implementation Plan
 
-We'll use pytest for our testing framework with the following principles:
-- Use temporary directories for test configurations
-- Test each function in isolation
-- Mock external dependencies
-- Cover both happy paths and error scenarios
-
-## Implementation Plan
-
-### 1. Set Up Test Fixtures
+#### 2.3.1 Set Up Test Fixtures
 
 ```python
 @pytest.fixture
@@ -49,9 +133,9 @@ def mock_user_service(mock_jira_client):
     return mock_service
 ```
 
-### 2. ConfigManager Tests
+#### 2.3.2 ConfigManager Tests
 
-#### Creation Tests
+##### Creation Tests
 - Test that initialization creates correct paths
 - Test that default config is created when file doesn't exist
 
@@ -70,7 +154,7 @@ def test_create_default_config(test_config_manager):
     assert "settings" in config
 ```
 
-#### Read Tests
+##### Read Tests
 - Test reading valid config
 - Test handling corrupt JSON
 - Test reading non-existent file
@@ -98,7 +182,7 @@ def test_read_corrupt_config(test_config_manager):
     assert "accounts" in config
 ```
 
-#### Write Tests
+##### Write Tests
 - Test writing new config
 - Test overwriting existing config
 
@@ -115,7 +199,7 @@ def test_write_new_config(test_config_manager):
     assert data == test_config
 ```
 
-#### Update Tests
+##### Update Tests
 - Test updating config with a function
 - Test transaction safety (should roll back on error)
 
@@ -138,9 +222,9 @@ def test_update_config(test_config_manager):
     assert updated_config["new_key"] == "new_value"
 ```
 
-### 3. Account Management Tests
+#### 2.3.3 Account Management Tests
 
-#### List Accounts Tests
+##### List Accounts Tests
 - Test empty account list
 - Test listing multiple accounts
 - Test identifying default account
@@ -174,7 +258,7 @@ def test_list_accounts_with_default(monkeypatch):
     assert default_account["name"] == "account1"
 ```
 
-#### Add Account Tests
+##### Add Account Tests
 - Test adding first account (becomes default)
 - Test adding additional accounts
 - Test validation of credentials
@@ -207,7 +291,7 @@ def test_add_first_account(monkeypatch, mock_user_service):
     assert updated_config["default_account"] == "test"
 ```
 
-#### Current Account Tests
+##### Current Account Tests
 - Test getting default account
 - Test environment variable override
 - Test behavior with no accounts
@@ -247,7 +331,7 @@ def test_get_current_account_env_override(monkeypatch):
     assert account["name"] == "account2"  # Should use account2 from env var
 ```
 
-#### Remove Account Tests
+##### Remove Account Tests
 - Test removing existing account
 - Test removing default account (should pick new default)
 - Test removing last account
@@ -280,7 +364,7 @@ def test_remove_account_standard(monkeypatch):
     assert updated_config["default_account"] == "account1"  # Unchanged
 ```
 
-#### Default Account Tests
+##### Default Account Tests
 - Test setting default account
 - Test error when setting non-existent account
 
@@ -313,7 +397,7 @@ def test_set_default_account(monkeypatch):
     assert updated_config["default_account"] == "account2"
 ```
 
-### 4. Integration Tests
+#### 2.3.4 Integration Tests
 
 Create integration tests that verify the entire flow:
 
@@ -357,6 +441,4 @@ def test_account_management_workflow(temp_config_dir, monkeypatch):
     assert len(accounts) == 1
     assert accounts[0]["name"] == "second"
 ```
-
-## Test File Structure
 

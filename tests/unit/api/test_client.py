@@ -5,7 +5,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 
 from taskra.api.client import JiraClient, get_client
-from taskra.config.account import get_current_account
+from taskra.api.auth import get_auth_details  # Import auth function instead
 
 
 class TestJiraClient:
@@ -28,6 +28,16 @@ class TestJiraClient:
         monkeypatch.setenv("JIRA_EMAIL", "env-user@example.com")
         monkeypatch.setenv("JIRA_API_TOKEN", "env-token")
         
+        # Mock get_auth_details to use environment variables
+        def mock_get_auth():
+            return {
+                'base_url': os.environ.get('JIRA_BASE_URL'),
+                'email': os.environ.get('JIRA_EMAIL'),
+                'token': os.environ.get('JIRA_API_TOKEN')
+            }
+        
+        monkeypatch.setattr("taskra.api.client.get_auth_details", mock_get_auth)
+        
         # Call get_client
         client = get_client()
         
@@ -45,17 +55,15 @@ class TestJiraClient:
         monkeypatch.delenv("JIRA_EMAIL", raising=False)
         monkeypatch.delenv("JIRA_API_TOKEN", raising=False)
         
-        # Mock get_current_account to return a test account
-        mock_account = {
-            "name": "test-account",
-            "url": "https://config-test.atlassian.net",
-            "email": "config-user@example.com",
-            "token": "config-token"
-        }
-        monkeypatch.setattr(
-            "taskra.api.client.get_current_account", 
-            lambda: mock_account
-        )
+        # Mock get_auth_details to return test account info
+        def mock_get_auth():
+            return {
+                'base_url': "https://config-test.atlassian.net",
+                'email': "config-user@example.com",
+                'token': "config-token"
+            }
+        
+        monkeypatch.setattr("taskra.api.client.get_auth_details", mock_get_auth)
         
         # Call get_client
         client = get_client()
@@ -74,14 +82,12 @@ class TestJiraClient:
         monkeypatch.delenv("JIRA_EMAIL", raising=False)
         monkeypatch.delenv("JIRA_API_TOKEN", raising=False)
         
-        # Mock get_current_account to return None (no account configured)
-        monkeypatch.setattr(
-            "taskra.api.client.get_current_account", 
-            lambda: None
-        )
+        # Mock get_auth_details to raise an error
+        def mock_get_auth():
+            raise ValueError("No Jira account configured.")
+        
+        monkeypatch.setattr("taskra.api.client.get_auth_details", mock_get_auth)
         
         # Verify it raises an error
-        with pytest.raises(ValueError) as excinfo:
+        with pytest.raises(ValueError):
             get_client()
-        
-        assert "No Jira account configured" in str(excinfo.value)
