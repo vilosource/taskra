@@ -25,8 +25,17 @@ class BaseJiraModel(BaseModel):
     """
     Base class for all Jira API models.
     
-    This class provides common configuration and utility methods
-    for all Jira API models to ensure consistent behavior.
+    This class provides common configuration and utility methods for all Jira API models 
+    to ensure consistent behavior across the application. It handles serialization to and 
+    from the Jira API format, including automatic conversion between snake_case (Python standard)
+    and camelCase (Jira API standard) field names. It also provides robust error handling
+    and graceful degradation when dealing with incomplete or invalid API responses.
+    
+    Features:
+    - Automatic field name conversion between snake_case and camelCase
+    - Graceful handling of missing or invalid API data
+    - Consistent serialization of datetime objects
+    - Utility methods for API-compatible JSON output
     """
     
     model_config = ConfigDict(
@@ -39,6 +48,13 @@ class BaseJiraModel(BaseModel):
         """
         Serialize model to API-compatible format.
         
+        This method converts the model to a dictionary suitable for sending to the Jira API,
+        ensuring that field names are in camelCase and datetime objects are properly serialized
+        to ISO format strings.
+        
+        Args:
+            **kwargs: Additional arguments to pass to model_dump
+            
         Returns:
             Dict with camelCase keys suitable for Jira API.
         """
@@ -64,6 +80,12 @@ class BaseJiraModel(BaseModel):
         """
         Serialize model to API-compatible JSON.
         
+        This method converts the model to a JSON string suitable for sending to the Jira API,
+        ensuring that field names are in camelCase.
+        
+        Args:
+            **kwargs: Additional arguments to pass to model_dump_json
+            
         Returns:
             JSON string with camelCase keys suitable for Jira API.
         """
@@ -76,11 +98,18 @@ class BaseJiraModel(BaseModel):
         """
         Create a model instance from API data.
         
+        This method provides robust handling of API responses, attempting to create a valid
+        model instance even if some fields have validation errors. It will:
+        1. Try to validate the full data
+        2. If validation fails, remove problematic fields
+        3. Apply sensible defaults for missing fields
+        4. Create a model with as much valid data as possible
+        
         Args:
             data: Dictionary from API response
         
         Returns:
-            An instance of this model
+            An instance of this model, potentially with default values for invalid fields
         """
         try:
             return cls.model_validate(data)
@@ -132,7 +161,15 @@ class BaseJiraModel(BaseModel):
                 return cls()
 
 class BaseJiraListModel(BaseJiraModel):
-    """Base class for paginated list responses from Jira."""
+    """
+    Base class for paginated list responses from Jira.
+    
+    This class represents paginated list responses commonly returned by the Jira API.
+    It provides standard fields for handling pagination, including the starting index,
+    maximum results per page, and total items available. This allows for consistent
+    handling of paginated responses throughout the application and simplifies
+    iterating through multiple pages of results.
+    """
     
     start_at: int = Field(..., description="Index of the first item")
     max_results: int = Field(..., description="Maximum results per page")
@@ -140,7 +177,16 @@ class BaseJiraListModel(BaseJiraModel):
     
 
 class ApiResource(BaseJiraModel):
-    """Base class for API resources with standard fields."""
+    """
+    Base class for API resources with standard fields.
+    
+    This class provides a foundation for all Jira API resources that have a self URL,
+    which is nearly all resources in the Jira REST API. It handles the field name conflict
+    between Python's 'self' keyword and Jira's 'self' field by mapping it to 'self_url',
+    while maintaining compatibility through a property getter.
+    
+    The class also provides URL validation to ensure the self URL is properly formatted.
+    """
     
     # Change from 'self' to 'self_url' to avoid Python keyword conflict
     self_url: str = Field(..., alias="self", description="URL to this resource")
@@ -148,14 +194,30 @@ class ApiResource(BaseJiraModel):
     @field_validator("self_url")
     @classmethod
     def validate_self_url(cls, v: str) -> str:
-        """Validate that self_url is a valid URL."""
+        """
+        Validate that self_url is a valid URL.
+        
+        Args:
+            v: The URL string to validate
+            
+        Returns:
+            The validated URL string
+            
+        Raises:
+            ValueError: If the URL doesn't start with http:// or https://
+        """
         if not v.startswith(("http://", "https://")):
             raise ValueError("self_url must start with http:// or https://")
         return v
         
     @property
     def self(self) -> str:
-        """Property getter to maintain backward compatibility with tests and existing code."""
+        """
+        Property getter to maintain backward compatibility with tests and existing code.
+        
+        Returns:
+            The self URL as a string
+        """
         return self.self_url
 
 
@@ -163,7 +225,11 @@ class TimestampedResource(ApiResource):
     """
     Base class for resources with creation and update timestamps.
     
-    Many Jira resources include created and updated timestamps.
+    This class extends ApiResource to add timestamp fields that are common to many
+    Jira resources. It standardizes the handling of creation and update timestamps,
+    ensuring consistent datetime handling across the application. This is particularly
+    useful for resources like issues, comments, and worklogs that track when they were
+    created and last modified.
     """
     
     created: datetime = Field(..., description="When this resource was created")

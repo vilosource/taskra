@@ -9,18 +9,18 @@ from typing import Dict, Any, Optional
 class ConfigManager:
     """
     Configuration manager for Taskra.
-    
-    Handles reading, writing, and updating configuration files.
+
+    This class is responsible for managing the configuration files used by Taskra. It provides methods to read, write, and update configuration files, ensuring that the configuration directory and files are properly handled. The configuration files store settings such as user accounts, application preferences, and other customizable options.
     """
     
     def __init__(self, config_dir: Optional[str] = None, config_file: str = "config.json", debug: bool = False):
         """
         Initialize the configuration manager.
-        
+
         Args:
             config_dir: Directory to store configuration (default: ~/.taskra)
             config_file: Name of the configuration file
-            debug: Enable debug output
+            debug: Enable debug output for troubleshooting and development purposes
         """
         self.debug = debug
         
@@ -48,7 +48,9 @@ class ConfigManager:
     def read_config(self) -> Dict[str, Any]:
         """
         Read configuration from file.
-        
+
+        This method reads the configuration file and returns its contents as a dictionary. If the file does not exist or is corrupted, a default configuration is created and returned.
+
         Returns:
             Configuration dictionary
         """
@@ -74,7 +76,9 @@ class ConfigManager:
     def write_config(self, config: Dict[str, Any]) -> None:
         """
         Write configuration to file.
-        
+
+        This method writes the given configuration dictionary to the configuration file. It ensures that the configuration directory exists before writing and uses a temporary file to avoid partial writes.
+
         Args:
             config: Configuration dictionary
         """
@@ -106,7 +110,9 @@ class ConfigManager:
     def _create_default_config(self) -> Dict[str, Any]:
         """
         Create a default configuration.
-        
+
+        This method generates a default configuration dictionary with predefined settings and writes it to the configuration file.
+
         Returns:
             Default configuration dictionary
         """
@@ -125,7 +131,9 @@ class ConfigManager:
     def update_config(self, update_func) -> Dict[str, Any]:
         """
         Update configuration using a function.
-        
+
+        This method allows updating the configuration by applying a user-provided function to the current configuration. The function should take the current configuration as input and return the updated configuration.
+
         Args:
             update_func: Function that takes the current config and returns the updated config
             
@@ -151,13 +159,24 @@ config_manager = ConfigManager()
 
 # Function to enable debug mode for the global instance
 def enable_debug_mode():
-    """Enable debug mode for the global ConfigManager instance."""
+    """
+    Enable debug mode for the global ConfigManager instance.
+
+    This function sets the debug flag to True for the global instance of ConfigManager, allowing detailed debug output to be printed to the console. Useful for troubleshooting configuration-related issues.
+    """
     global config_manager
     config_manager.debug = True
     print("DEBUG: Enabled debug mode for global ConfigManager")
 
 def get_auth_details():
-    """Get authentication details from environment or config."""
+    """
+    Get authentication details from environment or config.
+
+    This function retrieves authentication details such as the base URL, email, and API token from environment variables. These details are typically used for connecting to external services like JIRA.
+
+    Returns:
+        A dictionary containing the authentication details.
+    """
     import os
     return {
         'base_url': os.environ.get('JIRA_BASE_URL'),

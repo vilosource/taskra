@@ -2,7 +2,7 @@
 name = "taskra"
 version = "0.1.1"
 description = "A command-line tool for task and project management"
-authors = ["Jason Viloria <jason.viloria@optiscangroup.com>"]
+authors = ["JV <jason.viloria@outlook.com>"]
 readme = "README.md"
 packages = [{include = "taskra"}]
 
