@@ -8,13 +8,33 @@ Taskra is a powerful command-line tool for managing Jira projects, issues, workl
 
 ### Installation
 
-Clone the repository and install dependencies:
+The recommended way to install Taskra is with [pipx](https://pipx.pypa.io/), which keeps it isolated and easy to upgrade or uninstall:
+
+```bash
+pipx install git+https://github.com/yourusername/taskra.git
+```
+
+This will install the latest stable release from the `main` branch.
+
+---
+
+If you'd like to try the latest development version, you can clone the `develop` branch and install it locally:
+
+```bash
+git clone --branch develop https://github.com/yourusername/taskra.git
+cd taskra
+poetry install
+```
+
+Alternatively, to install the stable release manually from `main`:
 
 ```bash
 git clone https://github.com/yourusername/taskra.git
 cd taskra
-pip install -r requirements.txt
+poetry install
 ```
+
+> **Note:** This project uses [Poetry](https://python-poetry.org/) for dependency management. Make sure you have Poetry installed before running the above commands.
 
 ### Configuration
 
