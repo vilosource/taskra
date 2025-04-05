@@ -1,6 +1,6 @@
 # Taskra
 
-Taskra is a command-line tool for managing Jira projects, issues, worklogs, and reports efficiently from your terminal. It aims to streamline your workflow by providing quick access to common Jira operations without leaving the command line.
+Taskra is a powerful command-line tool for managing Jira projects, issues, worklogs, and generating reports directly from your terminal. It streamlines your workflow by providing fast, scriptable access to Jira, saving you time and reducing context switching.
 
 ---
 
@@ -18,7 +18,7 @@ pip install -r requirements.txt
 
 ### Configuration
 
-Before using Taskra, add your Jira account credentials:
+Before using Taskra, configure your Jira account:
 
 ```bash
 taskra config add
@@ -26,11 +26,11 @@ taskra config add
 
 You will be prompted for:
 
-- Jira URL (e.g., `https://yourcompany.atlassian.net`)
-- Email address
-- API token (create at https://id.atlassian.com/manage-profile/security/api-tokens)
+- **Jira URL** (e.g., `https://yourcompany.atlassian.net`)
+- **Email address**
+- **API token** (create at [Atlassian API tokens](https://id.atlassian.com/manage-profile/security/api-tokens))
 
-You can list, remove, or set default accounts with:
+Manage accounts:
 
 ```bash
 taskra config list
@@ -58,10 +58,22 @@ Fetch details of a specific issue:
 taskra issue <ISSUE-KEY>
 ```
 
-Create a new issue (interactive prompt):
+Create a new issue interactively:
 
 ```bash
 taskra issue create
+```
+
+Update an issue:
+
+```bash
+taskra issue update <ISSUE-KEY>
+```
+
+Add a comment to an issue:
+
+```bash
+taskra issue comment <ISSUE-KEY> --message "Your comment here"
 ```
 
 #### Tickets Report
@@ -72,7 +84,12 @@ Generate a report of tickets in a project with filters:
 taskra tickets <PROJECT-KEY> --start-date YYYY-MM-DD --end-date YYYY-MM-DD --status "In Progress" --assignee "john.doe"
 ```
 
-Options include grouping, sorting, and output format (table, JSON, CSV).
+Options:
+
+- `--group-by status|assignee|none`
+- `--sort-by created|updated|status|assignee|priority`
+- `--format table|json|csv`
+- `--reverse/--no-reverse` (sort order)
 
 #### Worklogs
 
@@ -88,6 +105,12 @@ Add a worklog to an issue:
 taskra worklogs add <ISSUE-KEY> <time-spent> --comment "Worked on feature X"
 ```
 
+Example:
+
+```bash
+taskra worklogs add PROJ-123 2h30m --comment "Bug fixes and testing"
+```
+
 #### Reports
 
 Generate cross-project reports:
@@ -98,13 +121,28 @@ taskra report cross --projects PROJ1,PROJ2 --start-date YYYY-MM-DD --end-date YY
 
 ---
 
-### Debugging
+### Debugging & Verbose Output
 
-Enable debug output with:
+Enable debug output to troubleshoot API calls:
 
 ```bash
 taskra --debug verbose <command>
 ```
+
+Debug levels:
+
+- `none` (default)
+- `error`
+- `info`
+- `verbose`
+
+---
+
+## Tips
+
+- Use shell completion for faster command entry (see `scripts/taskra-completion.bash`).
+- Combine filters to narrow down results.
+- Use `--json` to get raw API data for scripting.
 
 ---
 
@@ -116,5 +154,7 @@ MIT License
 
 ## Contributing
 
-Contributions are welcome! Please open issues or pull requests.
+Contributions, bug reports, and feature requests are welcome! Please open an issue or submit a pull request.
+
+---
 

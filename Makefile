@@ -1,6 +1,6 @@
 # Taskra Makefile - Development and testing utilities
 
-.PHONY: clean test test-all test-core test-models test-integration lint examples setup
+.PHONY: clean test test-all test-core test-models test-integration lint examples setup publish
 
 # Default Python interpreter
 PYTHON = python
@@ -79,6 +79,12 @@ doc:
 doc-serve:
 	cd $(DOC_DIR) && mkdocs serve
 
+# Publish package to PyPI with version bump
+publish:
+	poetry version patch
+	poetry build
+	poetry publish
+
 # Help command
 help:
 	@echo "Available targets:"
@@ -95,3 +101,4 @@ help:
 	@echo "  watch       - Watch for file changes and run tests"
 	@echo "  doc         - Build documentation"
 	@echo "  doc-serve   - Serve documentation locally"
+	@echo "  publish     - Publish package to PyPI"
