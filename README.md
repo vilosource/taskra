@@ -11,10 +11,10 @@ Taskra is a powerful command-line tool for managing Jira projects, issues, workl
 The recommended way to install Taskra is with [pipx](https://pipx.pypa.io/), which keeps it isolated and easy to upgrade or uninstall:
 
 ```bash
-pipx install git+https://github.com/yourusername/taskra.git
+pipx install taskra
 ```
 
-This will install the latest stable release from the `main` branch.
+This will install the latest stable release published on PyPI.
 
 ---
 
