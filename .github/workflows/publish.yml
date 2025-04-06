@@ -4,14 +4,28 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Release type (patch, minor, major)'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
 
 jobs:
   build-publish:
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -28,9 +42,10 @@ jobs:
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
 
-      - name: Bump patch version
+      - name: Bump version
         run: |
-          poetry version patch
+          RELEASE_TYPE="${{ github.event.inputs.release_type || 'patch' }}"
+          poetry version $RELEASE_TYPE
           git add pyproject.toml
           git commit -m "ci: bump version [skip ci]"
           git tag v$(poetry version -s)
