@@ -4,5 +4,38 @@
     ],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
-    "makefile.configureOnOpen": false
+    "makefile.configureOnOpen": false,
+    "mcp": {
+        "servers": {
+            "mcp-atlassian": {
+                "command": "docker",
+                "args": [
+                    "run",
+                    "--rm",
+                    "-i",
+                    "mcp/atlassian",
+                    "--jira-url=https://viloforge.atlassian.net",
+                    "--jira-username=viloforge@outlook.com",
+                    "--jira-token=${input:jira_token}",
+                    "--confluence-url=https://viloforge.atlassian.net",
+                    "--confluence-username=viloforge@outlook.com",
+                    "--confluence-token=${input:confluence_token}"
+                ]
+            }
+        },
+        "inputs": [
+            {
+                "id": "jira_token",
+                "type": "promptString",
+                "description": "Jira API Token",
+                "password": true
+            },
+            {
+                "id": "confluence_token",
+                "type": "promptString",
+                "description": "Confluence API Token",
+                "password": true
+            }
+        ]
+    }
 }

@@ -167,3 +167,120 @@ def show_current():
     env_account = os.environ.get("TASKRA_ACCOUNT")
     if env_account and env_account == account["name"]:
         console.print("[dim](Set via TASKRA_ACCOUNT environment variable)[/dim]")
+
+@config_cmd.command("validate")
+@click.option("--config-name", "-n", help="Account config name to validate (default if omitted)")
+def validate_config(config_name: Optional[str]):
+    """Validate Jira credentials and permissions for an account."""
+    from ...config.account import list_accounts, get_current_account, validate_credentials
+    from ...api.client import JiraClient
+    from ...api.services.users import UserService
+    from ...api.services.permissions import PermissionsService
+
+    # Load account info
+    account = None
+    if config_name:
+        accounts = list_accounts()
+        for acc in accounts:
+            if acc["name"] == config_name:
+                account = acc
+                break
+        if not account:
+            console.print(f"[bold red]Account '{config_name}' not found.[/bold red]")
+            return
+    else:
+        account = get_current_account()
+        if not account:
+            console.print("[bold red]No default account configured.[/bold red]")
+            return
+
+    url = account.get("url")
+    email = account.get("email")
+    token = account.get("token")
+
+    if not token:
+        # token may not be included in list_accounts(), so reload full config
+        from ...config.manager import config_manager
+        config = config_manager.read_config()
+        acc_data = config.get("accounts", {}).get(account["name"], {})
+        token = acc_data.get("token")
+
+    console.print(f"Validating account: [bold]{account['name']}[/bold] ({email})")
+
+    # Step 1: Validate credentials
+    auth_ok = validate_credentials(url, email, token)
+    if not auth_ok:
+        console.print("[bold red]✗ Authentication failed. Invalid credentials.[/bold red]")
+        return
+    console.print("[bold green]✓ Authentication successful[/bold green]")
+
+    # Step 2: Check permissions
+    try:
+        client = JiraClient(base_url=url, email=email, api_token=token)
+        perm_service = PermissionsService(client)
+        ok, missing = perm_service.has_required_permissions()
+        if ok:
+            console.print("[bold green]✓ Required Jira permissions granted[/bold green]")
+        else:
+            console.print("[bold yellow]⚠ Missing permissions:[/bold yellow] " + ", ".join(missing))
+    except Exception as e:
+        console.print(f"[bold red]Error checking permissions:[/bold red] {str(e)}")
+
+@config_cmd.command("update")
+@click.option("--config-name", "-n", help="Account config name to update (default if omitted)")
+def update_account(config_name: Optional[str]):
+    """Update an existing Jira account configuration."""
+    from ...config.account import list_accounts, get_current_account, validate_credentials
+    from ...config.manager import config_manager
+
+    # Load account info
+    account = None
+    if config_name:
+        accounts = list_accounts()
+        for acc in accounts:
+            if acc["name"] == config_name:
+                account = acc
+                break
+        if not account:
+            console.print(f"[bold red]Account '{config_name}' not found.[/bold red]")
+            return
+    else:
+        account = get_current_account()
+        if not account:
+            console.print("[bold red]No default account configured.[/bold red]")
+            return
+
+    # Load full config to get token
+    config = config_manager.read_config()
+    acc_data = config.get("accounts", {}).get(account["name"], {})
+
+    # Prompt user for new values, defaulting to current
+    console.print(f"Updating account: [bold]{account['name']}[/bold]")
+    new_url = click.prompt("Jira URL", default=acc_data.get("url", ""), show_default=True)
+    new_email = click.prompt("Email", default=acc_data.get("email", ""), show_default=True)
+    new_token = click.prompt("API token (leave blank to keep existing)", default="", hide_input=True, show_default=False)
+
+    # If token left blank, keep existing
+    if not new_token:
+        new_token = acc_data.get("token", "")
+
+    # Validate new credentials
+    console.print("Validating updated credentials...")
+    if not validate_credentials(new_url, new_email, new_token):
+        console.print("[bold red]✗ Invalid credentials. Update aborted.[/bold red]")
+        return
+
+    # Save updated account info
+    def update_func(cfg):
+        accounts = cfg.get("accounts", {})
+        if account["name"] not in accounts:
+            console.print(f"[bold red]Account '{account['name']}' not found during update.[/bold red]")
+            return cfg
+        accounts[account["name"]]["url"] = new_url
+        accounts[account["name"]]["email"] = new_email
+        accounts[account["name"]]["token"] = new_token
+        cfg["accounts"] = accounts
+        return cfg
+
+    config_manager.update_config(update_func)
+    console.print(f"[bold green]✓ Account '{account['name']}' updated successfully.[/bold green]")

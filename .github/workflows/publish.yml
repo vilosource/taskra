@@ -35,7 +35,7 @@ jobs:
       - name: Install Poetry
         run: |
           curl -sSL https://install.python-poetry.org | python3 -
-          echo "export PATH=$HOME/.local/bin:$PATH" >> $GITHUB_ENV
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Configure git
         run: |
@@ -47,7 +47,7 @@ jobs:
           RELEASE_TYPE="${{ github.event.inputs.release_type || 'patch' }}"
           poetry version $RELEASE_TYPE
           git add pyproject.toml
-          git commit -m "ci: bump version [skip ci]"
+          git commit -m "ci: bump version [skip ci]" || echo "No changes to commit"
           git tag v$(poetry version -s)
 
       - name: Push version bump and tags
