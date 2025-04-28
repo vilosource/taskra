@@ -277,3 +277,28 @@ def get_user_worklogs(username=None, start_date=None, end_date=None, debug_level
     save_to_cache(cache_key, serializable_worklogs)
     
     return serializable_worklogs
+
+def get_last_worklog(issue_key: str) -> Optional[Dict[str, Any]]:
+    """
+    Retrieve the most recent worklog entry for a specific issue.
+
+    Args:
+        issue_key: The issue key (e.g., PROJECT-123).
+
+    Returns:
+        A dictionary representing the most recent worklog entry, or None if no worklogs exist.
+    """
+    logger.info(f"Fetching the last worklog for issue {issue_key}")
+
+    # Fetch all worklogs for the issue
+    worklogs = list_worklogs(issue_key)
+
+    if not worklogs:
+        logger.info(f"No worklogs found for issue {issue_key}")
+        return None
+
+    # Sort worklogs by their 'started' time in descending order
+    sorted_worklogs = sorted(worklogs, key=lambda w: w.get("started", ""), reverse=True)
+
+    # Return the most recent worklog
+    return sorted_worklogs[0] if sorted_worklogs else None

@@ -193,6 +193,7 @@ def list_worklogs_cmd(ctx, username, all, start, end, gaps, json, refresh_cache,
     table = Table(title="Worklogs")
     table.add_column("Work Date", style="cyan")
     table.add_column("Work Start Time", style="cyan")  # Added column for start time
+    table.add_column("Work End Time", style="cyan")  # Added column for end time
     table.add_column("Issue", style="green")
     table.add_column("Author", style="yellow")
     table.add_column("Time Spent", style="magenta")
@@ -234,11 +235,11 @@ def list_worklogs_cmd(ctx, username, all, start, end, gaps, json, refresh_cache,
             task = progress.add_task("Processing entries...", total=total_entries)
             
             for i, entry in enumerate(display_entries):
-                _add_entry_to_table(table, entry)
+                _add_entry_to_table_with_end_time(table, entry)
                 progress.update(task, advance=1)
     else:
         for entry in display_entries:
-            _add_entry_to_table(table, entry)
+            _add_entry_to_table_with_end_time(table, entry)
     
     console.print(table)
     
@@ -261,11 +262,12 @@ def list_worklogs_cmd(ctx, username, all, start, end, gaps, json, refresh_cache,
         console.print(f"[bold]Total gaps:[/bold] {len(gap_entries)}")
         console.print(f"[bold]Total unlogged time:[/bold] {gap_time_summary}")
 
-def _add_entry_to_table(table, entry):
-    """Add a worklog or gap entry to the table."""
+def _add_entry_to_table_with_end_time(table, entry):
+    """Add a worklog or gap entry to the table, including end time."""
     date_str = ""
     time_str = ""
-    
+    end_time_str = ""
+
     # Extract date and time
     if "started" in entry:
         started = entry["started"]
@@ -280,7 +282,14 @@ def _add_entry_to_table(table, entry):
                 time_str = time_part[:5]
         else:
             date_str = str(started)
-    
+
+    # Calculate end time
+    if "timeSpentSeconds" in entry:
+        start_time = _parse_worklog_datetime(entry)
+        duration_seconds = entry.get("timeSpentSeconds", 0)
+        end_time = start_time + datetime.timedelta(seconds=duration_seconds)
+        end_time_str = end_time.strftime("%H:%M")
+
     # Check if this is a gap entry
     if entry.get("is_gap", False):
         # For gaps, use a special format
@@ -288,11 +297,12 @@ def _add_entry_to_table(table, entry):
         author = ""
         time_spent = entry.get("timeSpent", "")
         comment = ""
-        
+
         # Use a different style for gap entries
         table.add_row(
             date_str, 
             time_str, 
+            end_time_str,  # Add end time for gaps
             f"[bold red]{issue_display}[/bold red]", 
             author, 
             f"[bold red]{time_spent}[/bold red]", 
@@ -303,21 +313,21 @@ def _add_entry_to_table(table, entry):
         issue_key = entry.get("issueKey", "")
         if not issue_key:
             issue_key = entry.get("issue_key", "")
-        
+
         if not issue_key and "issue" in entry and isinstance(entry["issue"], dict):
             issue_key = entry["issue"].get("key", "")
-        
+
         issue_display = issue_key
         if "issueSummary" in entry or "issue_summary" in entry:
             summary = entry.get("issueSummary", "") or entry.get("issue_summary", "")
             if summary:
                 issue_display = f"{issue_key}: {summary}"
-        
+
         author = entry.get("author", {}).get("displayName", "")
         time_spent = entry.get("timeSpent", "")
         comment = _extract_worklog_comment(entry)
-        
-        table.add_row(date_str, time_str, issue_display, author, time_spent, comment)
+
+        table.add_row(date_str, time_str, end_time_str, issue_display, author, time_spent, comment)
 
 @worklogs_cmd.command("add")
 @click.argument("issue_key", required=True)
@@ -493,6 +503,22 @@ def submit_worklog_cmd(ctx, issue_id, comment, starttime, endtime, json, debug):
         if debug:
             import traceback
             traceback.print_exception(type(e), e, e.__traceback__)
+
+@worklogs_cmd.command("log-work")
+@click.argument("issue_id", required=True)
+@click.option("-c", "--comment", help="Comment for the worklog")
+@click.option("-s", "--starttime", required=True, help="Start time in HH:MM format")
+@click.option("-e", "--endtime", help="End time in HH:MM format (defaults to now)")
+@click.option("--json", "-j", is_flag=True, help="Output raw JSON")
+@click.option("--debug", is_flag=True, help="Show debug information")
+@click.pass_context
+def log_work_cmd(ctx, issue_id, comment, starttime, endtime, json, debug):
+    """
+    Log work for a specific issue.
+
+    ISSUE_ID: The Jira issue ID (e.g., PROJECT-123).
+    """
+    submit_worklog_cmd(ctx, issue_id, comment, starttime, endtime, json, debug)
 
 def _extract_worklog_comment(worklog):
     """Extract comment text from a worklog entry."""
