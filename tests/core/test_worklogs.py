@@ -95,7 +95,7 @@ class TestAddWorklog:
 
         mock_get_client.assert_called_once()
         mock_service_class.assert_called_once_with(mock_client)
-        mock_service.add_worklog.assert_called_once_with("TEST-123", "1h", "Test comment")
+        mock_service.add_worklog.assert_called_once_with("TEST-123", "1h", "Test comment", None)
         assert result == {"id": "123", "timeSpent": "1h"}
 
     @patch("taskra.core.worklogs.get_client")
@@ -108,7 +108,7 @@ class TestAddWorklog:
 
         result = add_worklog("TEST-123", "1h")
 
-        mock_service.add_worklog.assert_called_once_with("TEST-123", "1h", None)
+        mock_service.add_worklog.assert_called_once_with("TEST-123", "1h", None, None)
         assert result == {"id": "123", "timeSpent": "1h"}
 
 

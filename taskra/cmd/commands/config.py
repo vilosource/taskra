@@ -284,3 +284,317 @@ def update_account(config_name: Optional[str]):
 
     config_manager.update_config(update_func)
     console.print(f"[bold green]✓ Account '{account['name']}' updated successfully.[/bold green]")
+
+@config_cmd.command("check")
+@click.option("--name", "-n", help="Account name to check (uses default if not specified)")
+@click.option("--detailed", "-d", is_flag=True, help="Show detailed permission information")
+def check_account(name: Optional[str], detailed: bool):
+    """
+    Check if an account is valid and what permissions it has.
+    
+    This command verifies that the account can connect to Jira,
+    checks the validity of the API token, and lists the permissions
+    the account has on the Jira instance.
+    """
+    from ...config.account import get_current_account, list_accounts
+    from ...api.client import JiraClient
+    import requests
+    from requests.auth import HTTPBasicAuth
+    from rich.table import Table
+    
+    # Get the account to check
+    account = None
+    if name:
+        accounts = list_accounts()
+        for acc in accounts:
+            if acc["name"] == name:
+                account = acc
+                break
+        if not account:
+            console.print(f"[bold red]Error:[/bold red] Account '{name}' not found.")
+            return
+    else:
+        account = get_current_account()
+        if not account:
+            console.print("[bold red]Error:[/bold red] No default account configured.")
+            console.print("Use [bold]taskra config add[/bold] to add an account or specify an account with --name.")
+            return
+    
+    # Extract account details
+    url = account.get("url")
+    email = account.get("email")
+    
+    # Token is not included in the account info from list_accounts, so we need to get it from the config
+    from ...config.manager import config_manager
+    config = config_manager.read_config()
+    token = config.get("accounts", {}).get(account["name"], {}).get("token")
+    
+    if not token:
+        console.print(f"[bold red]Error:[/bold red] Could not retrieve token for account '{account['name']}'.")
+        return
+    
+    console.print(f"Checking account: [bold]{account['name']}[/bold] ({email})")
+    console.print(f"Jira URL: {url}")
+    
+    # Ensure the URL doesn't end with a slash
+    if url.endswith('/'):
+        url = url[:-1]
+    
+    # Create auth object for API requests
+    auth = HTTPBasicAuth(email, token)
+    
+    # Headers for API requests
+    headers = {
+        "Accept": "application/json"
+    }
+    
+    # Step 1: Verify user identity
+    console.print("\n[bold]Verifying account authentication...[/bold]")
+    try:
+        myself_endpoint = f"{url}/rest/api/3/myself"
+        response = requests.get(
+            myself_endpoint,
+            auth=auth,
+            headers=headers
+        )
+        
+        if response.status_code == 200:
+            user_data = response.json()
+            console.print(f"[bold green]✓ Authentication successful[/bold green]")
+            console.print(f"Authenticated as: {user_data.get('displayName')} ({user_data.get('emailAddress')})")
+            console.print(f"Account ID: {user_data.get('accountId')}")
+            console.print(f"Account active: {'Yes' if user_data.get('active', False) else 'No'}")
+            
+            # Display groups if available and detailed flag is set
+            if detailed and "groups" in user_data and "items" in user_data["groups"]:
+                groups = user_data["groups"]["items"]
+                if groups:
+                    console.print("\n[bold]Group Memberships:[/bold]")
+                    for group in groups:
+                        console.print(f"- {group.get('name', 'Unknown group')}")
+                else:
+                    console.print("\n[bold]Group Memberships:[/bold] None")
+            
+            # Display application roles if available and detailed flag is set
+            if detailed and "applicationRoles" in user_data and "items" in user_data["applicationRoles"]:
+                roles = user_data["applicationRoles"]["items"]
+                if roles:
+                    console.print("\n[bold]Application Roles:[/bold]")
+                    for role in roles:
+                        console.print(f"- {role.get('name', 'Unknown role')}")
+                else:
+                    console.print("\n[bold]Application Roles:[/bold] None")
+        else:
+            console.print(f"[bold red]✗ Authentication failed[/bold red] (Status code: {response.status_code})")
+            if response.status_code == 401:
+                console.print("Invalid credentials. Please check your email and API token.")
+            elif response.status_code == 403:
+                console.print("Permission denied. Your account may not have sufficient permissions.")
+            return
+    except Exception as e:
+        console.print(f"[bold red]✗ Connection error:[/bold red] {str(e)}")
+        return
+    
+    # Step 2: Check permissions by testing different endpoints
+    console.print("\n[bold]Checking API permissions...[/bold]")
+    
+    # Define the endpoints to check with friendly names
+    endpoints_to_check = [
+        {"name": "View Projects", "endpoint": "/rest/api/3/project/search", "method": "GET", 
+         "description": "List and view projects"},
+        {"name": "View Issues", "endpoint": "/rest/api/3/search", "method": "GET", 
+         "params": {"maxResults": 1}, "description": "Search and view issues"},
+        {"name": "Create Issue", "endpoint": "/rest/api/3/issue", "method": "POST", 
+         "check_only": True, "description": "Create new issues"},
+        {"name": "Edit Issue", "endpoint": "/rest/api/3/issue/{issueIdOrKey}", "method": "PUT", 
+         "check_only": True, "description": "Edit existing issues"},
+        {"name": "Add Comment", "endpoint": "/rest/api/3/issue/{issueIdOrKey}/comment", "method": "POST", 
+         "check_only": True, "description": "Add comments to issues"},
+        {"name": "View Worklogs", "endpoint": "/rest/api/3/issue/{issueIdOrKey}/worklog", "method": "GET", 
+         "check_only": True, "description": "View time tracking information"},
+        {"name": "Add Worklog", "endpoint": "/rest/api/3/issue/{issueIdOrKey}/worklog", "method": "POST", 
+         "check_only": True, "description": "Log work on issues"},
+    ]
+    
+    # Create a table for permissions
+    table = Table(title="Jira API Permissions")
+    table.add_column("Permission", style="cyan")
+    table.add_column("Status", justify="center")
+    table.add_column("Description", style="dim")
+    
+    # Find a sample issue key if needed
+    sample_issue_key = None
+    try:
+        search_response = requests.get(
+            f"{url}/rest/api/3/search",
+            auth=auth,
+            headers=headers,
+            params={"maxResults": 1}
+        )
+        if search_response.status_code == 200:
+            issues = search_response.json().get("issues", [])
+            if issues:
+                sample_issue_key = issues[0].get("key")
+    except:
+        pass
+    
+    # Check each endpoint
+    for check in endpoints_to_check:
+        endpoint = check["endpoint"]
+        method = check["method"]
+        
+        # Replace placeholders with actual values if we have them
+        if "{issueIdOrKey}" in endpoint and sample_issue_key:
+            endpoint = endpoint.replace("{issueIdOrKey}", sample_issue_key)
+        elif "{issueIdOrKey}" in endpoint and not sample_issue_key:
+            # Skip checks that require an issue key if we couldn't find one
+            table.add_row(
+                check["name"],
+                "[yellow]⚠ Skipped[/yellow]",
+                f"{check['description']} (No sample issue found)"
+            )
+            continue
+        
+        # For endpoints marked as check_only, we don't actually make the request
+        # as it might modify data - we just check if we could make the request
+        if check.get("check_only", False):
+            # For these, we check permission via options request
+            try:
+                options_response = requests.options(
+                    f"{url}{endpoint}",
+                    auth=auth,
+                    headers=headers
+                )
+                
+                # If we get a successful response or are specifically unauthorized
+                # (rather than a general server error), we can determine the permission
+                if options_response.status_code in [200, 204, 401, 403]:
+                    allowed_methods = options_response.headers.get("Allow", "").split(", ")
+                    if method in allowed_methods:
+                        table.add_row(
+                            check["name"],
+                            "[bold green]✓ Allowed[/bold green]",
+                            check["description"]
+                        )
+                    else:
+                        table.add_row(
+                            check["name"],
+                            "[bold red]✗ Not allowed[/bold red]",
+                            check["description"]
+                        )
+                else:
+                    table.add_row(
+                        check["name"],
+                        f"[yellow]⚠ Unknown ({options_response.status_code})[/yellow]",
+                        check["description"]
+                    )
+            except Exception as e:
+                table.add_row(
+                    check["name"],
+                    "[yellow]⚠ Error[/yellow]",
+                    f"{check['description']} (Error: {str(e)})"
+                )
+        else:
+            # For GET endpoints, make the actual request
+            try:
+                params = check.get("params", {})
+                response = requests.get(
+                    f"{url}{endpoint}",
+                    auth=auth,
+                    headers=headers,
+                    params=params
+                )
+                
+                if response.status_code in [200, 201, 204]:
+                    table.add_row(
+                        check["name"],
+                        "[bold green]✓ Allowed[/bold green]",
+                        check["description"]
+                    )
+                elif response.status_code in [401, 403]:
+                    table.add_row(
+                        check["name"],
+                        "[bold red]✗ Not allowed[/bold red]",
+                        check["description"]
+                    )
+                else:
+                    table.add_row(
+                        check["name"],
+                        f"[yellow]⚠ Error ({response.status_code})[/yellow]",
+                        check["description"]
+                    )
+            except Exception as e:
+                table.add_row(
+                    check["name"],
+                    "[yellow]⚠ Error[/yellow]",
+                    f"{check['description']} (Error: {str(e)})"
+                )
+    
+    # Display the permissions table
+    console.print(table)
+    
+    # Step 3: Check projects (since this is what you were having trouble with)
+    console.print("\n[bold]Checking project access...[/bold]")
+    try:
+        projects_response = requests.get(
+            f"{url}/rest/api/3/project/search",
+            auth=auth,
+            headers=headers,
+            params={"maxResults": 50}
+        )
+        
+        if projects_response.status_code == 200:
+            projects_data = projects_response.json()
+            projects = projects_data.get("values", [])
+            project_count = len(projects)
+            
+            if project_count > 0:
+                console.print(f"[bold green]✓ Found {project_count} projects[/bold green]")
+                
+                if detailed and project_count > 0:
+                    projects_table = Table(title="Available Projects")
+                    projects_table.add_column("Key", style="cyan")
+                    projects_table.add_column("Name")
+                    projects_table.add_column("Type", style="dim")
+                    
+                    for project in projects[:10]:  # Limit to first 10 projects
+                        projects_table.add_row(
+                            project.get("key", "Unknown"),
+                            project.get("name", "Unknown"),
+                            project.get("projectTypeKey", "Unknown")
+                        )
+                    
+                    if project_count > 10:
+                        console.print(projects_table)
+                        console.print(f"[dim]...and {project_count - 10} more projects[/dim]")
+                    else:
+                        console.print(projects_table)
+            else:
+                console.print("[bold yellow]⚠ No projects found[/bold yellow]")
+                console.print("Your account may not have permission to view any projects, or there might not be any projects in this Jira instance.")
+                console.print("Possible solutions:")
+                console.print("1. Ask a Jira administrator to grant you access to at least one project")
+                console.print("2. Create a new project if you have permission to do so")
+        else:
+            console.print(f"[bold red]✗ Failed to retrieve projects[/bold red] (Status code: {projects_response.status_code})")
+    except Exception as e:
+        console.print(f"[bold red]✗ Error checking projects:[/bold red] {str(e)}")
+    
+    # Final summary
+    console.print("\n[bold]Summary:[/bold]")
+    if user_data.get("active", False):
+        console.print("[bold green]✓ Your account is active and authenticated successfully.[/bold green]")
+        if sample_issue_key:
+            console.print("[bold green]✓ You have access to at least one issue.[/bold green]")
+        else:
+            console.print("[bold yellow]⚠ You don't appear to have access to any issues.[/bold yellow]")
+        
+        project_count = len(projects) if 'projects' in locals() else 0
+        if project_count > 0:
+            console.print(f"[bold green]✓ You have access to {project_count} projects.[/bold green]")
+        else:
+            console.print("[bold yellow]⚠ You don't have access to any projects.[/bold yellow]")
+            console.print("This is likely why 'taskra projects' is not showing any results.")
+    else:
+        console.print("[bold red]✗ Your account appears to be inactive.[/bold red]")
+        console.print("Please contact your Jira administrator to resolve this issue.")

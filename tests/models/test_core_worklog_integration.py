@@ -41,7 +41,7 @@ class TestCoreWorklogIntegration:
         # Verify
         mock_get_client.assert_called_once()
         mock_service_class.assert_called_once_with(mock_client)
-        mock_service.add_worklog.assert_called_once_with("TEST-123", "1h 30m", "Test comment")
+        mock_service.add_worklog.assert_called_once_with("TEST-123", "1h 30m", "Test comment", None)
         
         # The result should be a dictionary with the correct values
         assert isinstance(result, dict)
