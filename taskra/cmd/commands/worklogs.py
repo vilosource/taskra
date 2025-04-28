@@ -410,6 +410,90 @@ def add_worklog_cmd(ctx, issue_key, time_spent, comment, date, time, json, debug
             import traceback
             traceback.print_exception(type(e), e, e.__traceback__)
 
+@worklogs_cmd.command("submit-worklog")
+@click.argument("issue_id", required=True)
+@click.option("-c", "--comment", help="Comment for the worklog")
+@click.option("-s", "--starttime", required=True, help="Start time in HH:MM format")
+@click.option("-e", "--endtime", help="End time in HH:MM format (defaults to now)")
+@click.option("--json", "-j", is_flag=True, help="Output raw JSON")
+@click.option("--debug", is_flag=True, help="Show debug information")
+@click.pass_context
+def submit_worklog_cmd(ctx, issue_id, comment, starttime, endtime, json, debug):
+    """
+    Submit a worklog for a specific issue.
+
+    ISSUE_ID: The Jira issue ID (e.g., PROJECT-123).
+    """
+    from ...core import add_worklog
+    import datetime as dt
+    import json as json_lib
+    logger = logging.getLogger(__name__)
+
+    # Parse start time
+    try:
+        today = dt.datetime.now().strftime("%Y-%m-%d")
+        start_time = dt.datetime.fromisoformat(f"{today}T{starttime}:00")
+    except ValueError:
+        console.print("[bold red]Error:[/bold red] Invalid start time format. Use HH:MM.")
+        return
+
+    # Parse end time or default to now
+    if endtime:
+        try:
+            end_time = dt.datetime.fromisoformat(f"{today}T{endtime}:00")
+        except ValueError:
+            console.print("[bold red]Error:[/bold red] Invalid end time format. Use HH:MM.")
+            return
+    else:
+        end_time = dt.datetime.now()
+
+    # Validate time range
+    if end_time <= start_time:
+        console.print("[bold red]Error:[/bold red] End time must be after start time.")
+        return
+
+    # Calculate time spent
+    duration_seconds = int((end_time - start_time).total_seconds())
+    time_spent = _format_time_duration(duration_seconds)
+
+    # Debug information
+    if debug:
+        logger.info(f"Issue ID: {issue_id}")
+        logger.info(f"Start Time: {start_time}")
+        logger.info(f"End Time: {end_time}")
+        logger.info(f"Time Spent: {time_spent}")
+        if comment:
+            logger.info(f"Comment: {comment}")
+
+    # Submit the worklog
+    try:
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[bold blue]Submitting worklog..."),
+            console=console,
+            transient=True
+        ) as progress:
+            progress.add_task("Submitting", total=None)
+            result = add_worklog(issue_id, time_spent, comment, start_time)
+
+        # Output result
+        if json:
+            console.print(json_lib.dumps(result, indent=2))
+        else:
+            console.print(f"[bold green]✓[/bold green] Worklog submitted for [bold]{issue_id}[/bold]")
+            console.print(f"Time logged: [bold]{time_spent}[/bold]")
+            if comment:
+                console.print(f"Comment: {comment}")
+            if "id" in result:
+                console.print(f"Worklog ID: {result['id']}")
+
+    except Exception as e:
+        logger.error(f"Error submitting worklog: {str(e)}")
+        console.print(f"[bold red]Error:[/bold red] {str(e)}")
+        if debug:
+            import traceback
+            traceback.print_exception(type(e), e, e.__traceback__)
+
 def _extract_worklog_comment(worklog):
     """Extract comment text from a worklog entry."""
     comment = ""
