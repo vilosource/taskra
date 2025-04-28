@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "taskra"
-version = "0.1.7"
+version = "0.1.8"
 description = "A command-line tool for task and project management"
 authors = ["JV <jason.viloria@outlook.com>"]
 readme = "README.md"
